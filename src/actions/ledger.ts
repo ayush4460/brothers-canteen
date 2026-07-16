@@ -80,7 +80,7 @@ export async function addPurchase(customerId: string, amount: number) {
     revalidatePath(`/vendor/customers`)
     revalidatePath(`/vendor/dashboard`)
 
-    const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
+    const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('new_purchase', {
         customerId,
@@ -221,7 +221,7 @@ export async function addPayment(customerId: string, amount: number) {
     revalidatePath(`/vendor/customers`)
     revalidatePath(`/vendor/dashboard`)
 
-    const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
+    const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('new_payment', { 
         customerId,

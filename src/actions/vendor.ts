@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { createSession, deleteSession } from '@/lib/session'
 
-const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d?: unknown) => void } } }
+const globalWithIo = global as any
 
 export async function createCustomer(data: { phone: string; name: string }) {
   try {

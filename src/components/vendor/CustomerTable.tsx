@@ -16,7 +16,7 @@ import { Card, CardContent } from '@/components/ui/card'
 
 type Customer = {
   id: string
-  name: string
+  name: string | null
   phone: string
   currentBalance: number
   totalCollected: number
@@ -26,7 +26,7 @@ export default function CustomerTable({ customers }: { customers: Customer[] }) 
   const [searchTerm, setSearchTerm] = useState('')
 
   const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.name?.toLowerCase() ?? '').includes(searchTerm.toLowerCase()) ||
     c.phone.includes(searchTerm)
   )
 
@@ -54,7 +54,7 @@ export default function CustomerTable({ customers }: { customers: Customer[] }) 
             </div>
           ) : (
             filteredCustomers.map((c) => {
-              const initials = c.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+              const initials = (c.name || 'UN').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
               return (
                 <Link 
                   href={`/vendor/customers/${c.id}`} 
@@ -66,7 +66,7 @@ export default function CustomerTable({ customers }: { customers: Customer[] }) 
                       {initials}
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-semibold text-zinc-900">{c.name}</span>
+                      <span className="font-semibold text-zinc-900">{c.name || 'Unnamed Customer'}</span>
                       <span className="text-zinc-500 text-sm mt-0.5">{c.phone}</span>
                     </div>
                   </div>
@@ -108,7 +108,7 @@ export default function CustomerTable({ customers }: { customers: Customer[] }) 
                 </TableRow>
               ) : (
                 filteredCustomers.map((c) => {
-                  const initials = c.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                  const initials = (c.name || 'UN').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
                   return (
                     <TableRow key={c.id} className="border-zinc-100 hover:bg-zinc-50/50 transition-colors group">
                       <TableCell className="py-3 pl-6">
@@ -117,7 +117,7 @@ export default function CustomerTable({ customers }: { customers: Customer[] }) 
                             {initials}
                           </div>
                           <span className="font-semibold text-zinc-900 group-hover:text-emerald-600 transition-colors">
-                            {c.name}
+                            {c.name || 'Unnamed Customer'}
                           </span>
                         </Link>
                       </TableCell>

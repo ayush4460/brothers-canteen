@@ -3,7 +3,7 @@
 import { db } from '@/lib/db'
 import { createSession } from '@/lib/session'
 
-const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d?: unknown) => void } } }
+const globalWithIo = global as any
 
 export async function requestDeviceApproval(data: {
   phone: string
