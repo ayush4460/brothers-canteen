@@ -53,6 +53,10 @@ export default function CustomerLoginForm() {
       const deviceId = localStorage.getItem('deviceId')
       
       if (deviceId) {
+        socket.on('connect', () => {
+          socket.emit('join_room', `device_${deviceId}`)
+        })
+        
         socket.emit('join_room', `device_${deviceId}`)
         
         socket.on('device_approval_status', async (data: { status: string }) => {
