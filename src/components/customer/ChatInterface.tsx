@@ -43,7 +43,10 @@ export default function ChatInterface({
 
   useEffect(() => {
     const handleRefresh = () => {
-      forceRefreshCustomer().then(() => router.refresh())
+      forceRefreshCustomer().then(() => {
+        router.refresh()
+        markMessagesAsRead(customerId, 'CUSTOMER')
+      })
     }
 
     const handleVisibilityChange = () => {

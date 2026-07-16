@@ -17,22 +17,31 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
 
     socket.emit('join_vendor_dashboard')
 
-    socket.on('new_device_approval', () => {
-      router.refresh()
-    })
+    const handleRefresh = () => {
+      forceRefreshVendor().then(() => router.refresh())
+    }
 
-    socket.on('device_approval_handled', () => {
-      router.refresh()
+    const events = [
+      'new_device_approval', 
+      'device_approval_handled', 
+      'new_purchase', 
+      'purchase_edited', 
+      'purchase_deleted', 
+      'new_payment', 
+      'new_chat_message', 
+      'messages_read'
+    ]
+    
+    events.forEach(ev => {
+      socket.on(ev, () => {
+        handleRefresh()
+      })
     })
 
     socket.on('connect', () => {
       socket.emit('join_vendor_dashboard')
-      forceRefreshVendor().then(() => router.refresh())
+      handleRefresh()
     })
-
-    const handleRefresh = () => {
-      forceRefreshVendor().then(() => router.refresh())
-    }
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
