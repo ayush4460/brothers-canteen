@@ -61,8 +61,14 @@ export default function CustomerLoginForm() {
         
         socket.emit('join_room', `device_${deviceId}`)
         
+        let isHandling = false;
+        
         const handleStatus = async (statusStr: string) => {
+          if (isHandling) return;
+          isHandling = true;
+          
           if (statusStr === 'APPROVED') {
+            if (pollInterval) clearInterval(pollInterval)
             const res = await requestDeviceApproval({
               phone,
               deviceId,
@@ -72,12 +78,15 @@ export default function CustomerLoginForm() {
             })
             if (res.redirect) {
               router.push(res.redirect)
+            } else if (res.error) {
+              setStatus('ERROR')
+              setErrorMsg(res.error)
             }
           } else if (statusStr === 'REJECTED') {
+            if (pollInterval) clearInterval(pollInterval)
             setStatus('ERROR')
             setErrorMsg('Your request was rejected by the vendor.')
             socket.disconnect()
-            if (pollInterval) clearInterval(pollInterval)
           }
         }
 
