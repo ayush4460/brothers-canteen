@@ -18,7 +18,7 @@ export default function VendorLayoutClient({ children }: { children: React.React
   ]
 
   return (
-    <div className="flex h-screen bg-white text-zinc-900 flex-col md:flex-row overflow-hidden">
+    <div className="flex h-[100dvh] bg-white text-zinc-900 flex-col md:flex-row overflow-hidden">
       
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between h-16 px-4 bg-zinc-50 border-b border-zinc-200 shrink-0">
@@ -65,8 +65,8 @@ export default function VendorLayoutClient({ children }: { children: React.React
                   <Link 
                     href={link.href} 
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                      isActive ? 'bg-emerald-500/10 text-emerald-400' : 'text-zinc-400 hover:bg-zinc-200 hover:text-zinc-800'
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors ${
+                      isActive ? 'bg-emerald-100 text-emerald-700 font-semibold' : 'text-zinc-600 font-medium hover:bg-zinc-100 hover:text-zinc-900'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -79,11 +79,11 @@ export default function VendorLayoutClient({ children }: { children: React.React
         </nav>
         
         <div className="p-4 border-t border-zinc-200 shrink-0">
-          <div className="flex items-center gap-3 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-800 hover:bg-zinc-200 rounded-md cursor-pointer transition-colors">
+          <div className="flex items-center gap-3 px-3 py-2 text-sm text-zinc-600 font-medium hover:text-zinc-900 hover:bg-zinc-100 rounded-md cursor-pointer transition-colors">
             <Settings className="w-4 h-4" />
             <span>Settings</span>
           </div>
-          <button className="w-full flex items-center gap-3 px-3 py-2 mt-2 text-sm text-red-400 hover:bg-red-950/30 hover:text-red-300 rounded-md transition-colors">
+          <button className="w-full flex items-center gap-3 px-3 py-2 mt-2 text-sm text-red-600 font-medium hover:bg-red-50 hover:text-red-700 rounded-md transition-colors">
             <LogOut className="w-4 h-4" />
             <span>Logout</span>
           </button>
