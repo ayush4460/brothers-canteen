@@ -54,7 +54,7 @@ export default async function VendorChatPage() {
       phone: c.phone,
       balance: c.currentBalance,
       messages: combined,
-      unreadCount: 0 // Simplification for now
+      unreadCount: combined.filter(m => !m.isSelf && !m.read).length
     }
   }).sort((a, b) => {
     const lastA = a.messages.length > 0 ? a.messages[a.messages.length - 1].timestamp : 0
