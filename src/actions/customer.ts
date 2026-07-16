@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { createSession } from '@/lib/session'
+import { revalidatePath } from 'next/cache'
 
 const globalWithIo = global as any
 
@@ -65,4 +66,8 @@ export async function requestDeviceApproval(data: {
     console.error('Request device error:', error)
     return { error: 'Failed to request approval.' }
   }
+}
+
+export async function forceRefreshCustomer() {
+  revalidatePath('/c', 'layout')
 }

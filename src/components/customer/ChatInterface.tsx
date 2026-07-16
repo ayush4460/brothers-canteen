@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { forceRefreshCustomer } from '@/actions/customer'
 import { addPurchase } from '@/actions/ledger'
 import { SendHorizontal, Check, CheckCheck, Clock, WifiOff, Coffee, LogOut } from 'lucide-react'
 import { io } from 'socket.io-client'
@@ -41,13 +42,24 @@ export default function ChatInterface({
   }, [initialMessages, initialBalance])
 
   useEffect(() => {
+    const handleRefresh = () => {
+      forceRefreshCustomer().then(() => router.refresh())
+    }
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        router.refresh()
+        handleRefresh()
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleRefresh)
+    window.addEventListener('online', handleRefresh)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleRefresh)
+      window.removeEventListener('online', handleRefresh)
+    }
   }, [router])
 
   const scrollToBottom = () => {
@@ -79,7 +91,7 @@ export default function ChatInterface({
 
     socket.on('connect', () => {
       socket.emit('join_customer', customerId)
-      router.refresh() // Fetch any messages missed while disconnected
+      forceRefreshCustomer().then(() => router.refresh()) // Fetch any messages missed while disconnected
     })
 
     socket.on('new_payment', (data: { id: string, amount: number, newBalance: number, timestamp: number }) => {

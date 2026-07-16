@@ -183,3 +183,7 @@ export async function editCustomer(customerId: string, data: { name: string, pho
     return { error: 'Failed to edit customer.' }
   }
 }
+
+export async function forceRefreshVendor() {
+  revalidatePath('/vendor', 'layout')
+}

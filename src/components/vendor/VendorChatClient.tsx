@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { forceRefreshVendor } from '@/actions/vendor'
 import { Send, SendHorizontal, CheckCheck, Search, MoreVertical, Edit2, Trash2, X } from 'lucide-react'
 import { io } from 'socket.io-client'
 import { sendChatMessage, deletePurchase, editPurchaseAmount, markMessagesAsRead } from '@/actions/chat'
@@ -46,13 +47,24 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
   }, [initialCustomers])
 
   useEffect(() => {
+    const handleRefresh = () => {
+      forceRefreshVendor().then(() => router.refresh())
+    }
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        router.refresh()
+        handleRefresh()
       }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleRefresh)
+    window.addEventListener('online', handleRefresh)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleRefresh)
+      window.removeEventListener('online', handleRefresh)
+    }
   }, [router])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -88,7 +100,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
 
     socket.on('connect', () => {
       socket.emit('join_vendor_dashboard')
-      router.refresh() // Fetch any messages missed while disconnected
+      forceRefreshVendor().then(() => router.refresh()) // Fetch any messages missed while disconnected
     })
 
     socket.on('new_purchase', (data: { customerId: string, id: string, amount: number, timestamp: number }) => {
