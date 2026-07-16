@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Send, CheckCheck, Search, MoreVertical, Edit2, Trash2, X } from 'lucide-react'
+import { Send, SendHorizontal, CheckCheck, Search, MoreVertical, Edit2, Trash2, X } from 'lucide-react'
 import { io } from 'socket.io-client'
-import { sendChatMessage, deletePurchase, editPurchaseAmount } from '@/actions/chat'
+import { sendChatMessage, deletePurchase, editPurchaseAmount, markMessagesAsRead } from '@/actions/chat'
+import RecordPaymentModal from './RecordPaymentModal'
+import EditCustomerModal from './EditCustomerModal'
 
 type Message = {
   id: string
@@ -30,15 +32,19 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [inputValue, setInputValue] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const isSendingRef = useRef(false)
   const [editingMsg, setEditingMsg] = useState<{ id: string, amount: number } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId)
 
-  const filteredCustomers = customers.filter(c => 
-    c.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredCustomers = customers.filter(c =>
+    c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.phone.includes(searchQuery)
   )
 
@@ -51,6 +57,17 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
   }, [selectedCustomer?.messages])
 
   useEffect(() => {
+    if (selectedCustomerId) {
+      // Clear unread count locally
+      setCustomers(prev => prev.map(c => 
+        c.id === selectedCustomerId ? { ...c, unreadCount: 0 } : c
+      ))
+      // Mark as read on server
+      markMessagesAsRead(selectedCustomerId, 'VENDOR')
+    }
+  }, [selectedCustomerId])
+
+  useEffect(() => {
     const socket = io()
 
     socket.on('connect', () => {
@@ -58,6 +75,10 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
     })
 
     socket.on('new_purchase', (data: { customerId: string, id: string, amount: number, timestamp: number }) => {
+      if (selectedCustomerId === data.customerId) {
+        markMessagesAsRead(data.customerId, 'VENDOR')
+      }
+      
       setCustomers(prev => {
         const cIdx = prev.findIndex(c => c.id === data.customerId)
         if (cIdx === -1) return prev
@@ -74,7 +95,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
         if (selectedCustomerId !== data.customerId) {
           newC.unreadCount += 1
         }
-        
+
         // Move to top
         const updated = [...prev]
         updated.splice(cIdx, 1)
@@ -82,7 +103,87 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
       })
     })
 
-    // Additional listeners can be added for payments, text messages, edits, etc.
+    socket.on('new_payment', (data: { customerId: string, id: string, amount: number, newBalance: number, timestamp: number }) => {
+      setCustomers(prev => {
+        const cIdx = prev.findIndex(c => c.id === data.customerId)
+        if (cIdx === -1) return prev
+        const newC = { ...prev[cIdx] }
+        newC.messages = [...newC.messages, {
+          id: data.id,
+          type: 'PAYMENT',
+          amount: data.amount,
+          timestamp: data.timestamp || Date.now(),
+          isSelf: true
+        }]
+        newC.balance = data.newBalance
+
+        const updated = [...prev]
+        updated.splice(cIdx, 1)
+        return [newC, ...updated]
+      })
+    })
+
+    socket.on('messages_read', (data: { customerId: string, reader: 'VENDOR' | 'CUSTOMER' }) => {
+      if (data.reader === 'CUSTOMER') {
+        setCustomers(prev => prev.map(c => {
+          if (c.id === data.customerId) {
+            return {
+              ...c,
+              messages: c.messages.map(m => m.isSelf ? { ...m, read: true } : m)
+            }
+          }
+          return c
+        }))
+      }
+    })
+
+    socket.on('new_chat_message', (data: { customerId: string, id: string, text: string, sender: string, timestamp: number }) => {
+      setCustomers(prev => {
+        const cIdx = prev.findIndex(c => c.id === data.customerId)
+        if (cIdx === -1) return prev
+        const newC = { ...prev[cIdx] }
+        if (newC.messages.find(m => m.id === data.id)) return prev;
+
+        newC.messages = [...newC.messages, {
+          id: data.id,
+          type: 'TEXT',
+          text: data.text,
+          timestamp: data.timestamp || Date.now(),
+          isSelf: data.sender === 'VENDOR'
+        }]
+        if (selectedCustomerId !== data.customerId && data.sender !== 'VENDOR') {
+          newC.unreadCount += 1
+        }
+
+        const updated = [...prev]
+        updated.splice(cIdx, 1)
+        return [newC, ...updated]
+      })
+    })
+
+    socket.on('purchase_deleted', (data: { customerId: string, id: string }) => {
+      setCustomers(prev => prev.map(c => {
+        if (c.id === data.customerId) {
+          return {
+            ...c,
+            messages: c.messages.map(m => m.id === data.id ? { ...m, status: 'CANCELLED' } : m)
+          }
+        }
+        return c
+      }))
+    })
+
+    socket.on('purchase_edited', (data: { customerId: string, id: string, newAmount: number }) => {
+      setCustomers(prev => prev.map(c => {
+        if (c.id === data.customerId) {
+          return {
+            ...c,
+            messages: c.messages.map(m => m.id === data.id ? { ...m, amount: data.newAmount } : m)
+          }
+        }
+        return c
+      }))
+    })
 
     return () => {
       socket.disconnect()
@@ -91,17 +192,19 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedCustomerId || !inputValue.trim() || isSending) return
-    
+    if (!selectedCustomerId || !inputValue.trim() || isSendingRef.current) return
+
     const text = inputValue.trim()
     setInputValue('')
     setIsSending(true)
+    isSendingRef.current = true
 
     const res = await sendChatMessage(selectedCustomerId, text)
     if (res.success && res.message) {
       const msg = res.message
       setCustomers(prev => prev.map(c => {
         if (c.id === selectedCustomerId) {
+          if (c.messages.some(m => m.id === msg.id)) return c;
           return {
             ...c,
             messages: [...c.messages, {
@@ -117,6 +220,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
       }))
     }
     setIsSending(false)
+    isSendingRef.current = false
   }
 
   const handleDeletePurchase = async (purchaseId: string) => {
@@ -138,7 +242,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingMsg || !selectedCustomerId) return
-    
+
     const res = await editPurchaseAmount(editingMsg.id, editingMsg.amount)
     if (res.success) {
       setCustomers(prev => prev.map(c => {
@@ -156,7 +260,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
 
   return (
     <div className="flex w-full h-full bg-white overflow-hidden relative">
-      
+
       {/* LEFT SIDEBAR (List) */}
       <div className={`
         w-full md:w-80 bg-zinc-50 border-r border-zinc-200 flex flex-col shrink-0 absolute md:relative inset-0 z-20 transition-transform duration-300
@@ -168,9 +272,9 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
         <div className="p-2 border-b border-zinc-200 shrink-0">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-2.5 text-zinc-400" />
-            <input 
-              type="text" 
-              placeholder="Search customers..." 
+            <input
+              type="text"
+              placeholder="Search customers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-white border border-zinc-200 rounded-lg pl-9 pr-4 py-2 text-sm text-zinc-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -188,8 +292,8 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
             }
 
             return (
-              <div 
-                key={c.id} 
+              <div
+                key={c.id}
                 onClick={() => {
                   setSelectedCustomerId(c.id)
                   // clear unread count
@@ -232,7 +336,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
             {/* Chat Header */}
             <div className="h-16 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between px-4 md:px-6 shrink-0 relative z-20">
               <div className="flex items-center gap-3">
-                <button 
+                <button
                   onClick={() => setSelectedCustomerId(null)}
                   className="md:hidden p-2 -ml-2 text-zinc-400 hover:text-zinc-900"
                 >
@@ -246,126 +350,199 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
                   <p className="text-xs text-zinc-400 truncate">{selectedCustomer.phone}</p>
                 </div>
               </div>
-            <div className="flex items-center gap-4 text-zinc-400 font-medium">
-              <span>Balance: <span className="text-emerald-600 font-bold">₹{selectedCustomer.balance}</span></span>
-              <button className="p-2 hover:bg-zinc-200 rounded-full"><MoreVertical className="w-5 h-5" /></button>
-            </div>
-          </div>
+              <div className="flex items-center gap-4 text-zinc-400 font-medium">
+                <span>Balance: <span className="text-emerald-600 font-bold">₹{selectedCustomer.balance}</span></span>
 
-          {/* Chat Timeline */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {selectedCustomer.messages.map(msg => {
-              
-              if (msg.type === 'TEXT') {
-                return (
-                  <div key={msg.id} className={`flex flex-col w-full mb-2 ${msg.isSelf ? 'items-end' : 'items-start'}`}>
-                    <div className={`max-w-[75%] px-4 py-2 rounded-2xl shadow-sm relative group ${
-                      msg.isSelf 
-                        ? 'bg-emerald-700 text-white rounded-tr-sm' 
-                        : 'bg-zinc-200 text-zinc-800 rounded-tl-sm border border-zinc-300'
-                    }`}>
-                      <p className="text-[15px] leading-relaxed">{msg.text}</p>
-                      <div className={`flex items-center justify-end gap-1 mt-1 opacity-70 ${msg.isSelf ? 'text-emerald-200' : 'text-zinc-500'}`}>
-                        <span className="text-[10px] leading-none">
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {msg.isSelf && <CheckCheck className="h-3 w-3" />}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="p-2 hover:bg-zinc-200 rounded-full transition-colors"
+                  >
+                    <MoreVertical className="w-5 h-5" />
+                  </button>
+                  {isDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-30" onClick={() => setIsDropdownOpen(false)} />
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-zinc-200 shadow-lg rounded-xl overflow-hidden z-40 py-1">
+                        <button
+                          onClick={() => { setIsDropdownOpen(false); setIsEditModalOpen(true); }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-100 font-medium transition-colors"
+                        >
+                          Edit Customer
+                        </button>
+                        <button
+                          onClick={() => { setIsDropdownOpen(false); setIsPaymentModalOpen(true); }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-100 font-medium transition-colors"
+                        >
+                          Record Payment
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+              </div>
+            </div>
+
+            {/* Chat Timeline */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#efeae2]">
+              {selectedCustomer.messages.map(msg => {
+
+                if (msg.type === 'TEXT') {
+                  return (
+                    <div key={msg.id} className={`flex flex-col w-full mb-1 ${msg.isSelf ? 'items-end' : 'items-start'}`}>
+                      <div className={`relative max-w-[75%] rounded-lg shadow-sm px-2.5 py-1.5 ${msg.isSelf ? 'bg-[#d9fdd3] text-zinc-900 mr-2' : 'bg-white text-zinc-900 ml-2 group'}`}>
+                        {/* Tail */}
+                        {msg.isSelf ? (
+                          <div className="absolute top-0 -right-2 w-0 h-0 border-t-[10px] border-t-[#d9fdd3] border-r-[10px] border-r-transparent border-b-[10px] border-b-transparent"></div>
+                        ) : (
+                          <div className="absolute top-0 -left-2 w-0 h-0 border-t-[10px] border-t-white border-l-[10px] border-l-transparent border-b-[10px] border-b-transparent"></div>
+                        )}
+
+                        <div className="flex items-end gap-3">
+                          <p className="text-[15px] leading-snug break-words pt-0.5">{msg.text}</p>
+                          <div className={`flex items-center gap-1 shrink-0 mb-[1px] ${msg.isSelf ? 'text-emerald-700/80' : 'text-zinc-400'}`}>
+                            <span className="text-[10px] leading-none">
+                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {msg.isSelf && (
+                              msg.read 
+                                ? <CheckCheck className="h-3.5 w-3.5 text-blue-500" />
+                                : <CheckCheck className="h-3.5 w-3.5 text-zinc-400" />
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              }
+                  )
+                }
 
-              // Purchase or Payment
-              if (msg.type === 'PURCHASE') {
-                const isCancelled = msg.status === 'CANCELLED'
-                return (
-                  <div key={msg.id} className="flex flex-col items-start w-full mb-2">
-                      <div className={`max-w-[75%] px-4 py-2 rounded-2xl rounded-tl-sm shadow-sm relative group border ${
-                        isCancelled ? 'bg-zinc-50 text-zinc-400 border-zinc-200' : 'bg-zinc-200 text-zinc-900 border-zinc-200'
-                      }`}>
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="text-lg font-medium">
-                          {isCancelled ? <s>₹{msg.amount}</s> : `₹${msg.amount}`}
-                        </span>
+                // Purchase
+                if (msg.type === 'PURCHASE') {
+                  const isCancelled = msg.status === 'CANCELLED'
+                  return (
+                    <div key={msg.id} className="flex flex-col items-start w-full mb-1">
+                      <div className={`relative max-w-[75%] rounded-lg shadow-sm px-2.5 py-1.5 ml-2 group ${isCancelled ? 'bg-zinc-50 text-zinc-400' : 'bg-white text-zinc-900'}`}>
+                        {/* Tail */}
+                        <div className={`absolute top-0 -left-2 w-0 h-0 border-t-[10px] border-l-[10px] border-l-transparent border-b-[10px] border-b-transparent ${isCancelled ? 'border-t-zinc-50' : 'border-t-white'}`}></div>
+
+                        <div className="flex items-end gap-3 min-w-[70px]">
+                          <span className="text-[15px] leading-snug pt-0.5">
+                            {isCancelled ? <s>₹{msg.amount}</s> : `₹${msg.amount}`}
+                          </span>
+                          <div className="flex items-center gap-1 shrink-0 mb-[1px] text-zinc-400 ml-auto">
+                            <span className="text-[10px] leading-none">
+                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+
                         {!isCancelled && (
-                          <div className="hidden group-hover:flex items-center gap-2 absolute -right-16 top-1">
-                            <button onClick={() => setEditingMsg({ id: msg.id, amount: msg.amount || 0 })} className="p-1.5 bg-zinc-200 hover:bg-zinc-700 rounded-full text-zinc-400 border border-zinc-300 shadow-lg"><Edit2 className="w-3 h-3" /></button>
-                            <button onClick={() => handleDeletePurchase(msg.id)} className="p-1.5 bg-rose-900 hover:bg-rose-800 rounded-full text-rose-300 border border-rose-800 shadow-lg"><Trash2 className="w-3 h-3" /></button>
+                          <div className="hidden group-hover:flex items-center gap-1 absolute -right-14 top-1 z-10">
+                            <button onClick={() => setEditingMsg({ id: msg.id, amount: msg.amount || 0 })} className="p-1 text-zinc-400 hover:text-zinc-700 bg-white rounded-full shadow-sm border border-zinc-200"><Edit2 className="w-3 h-3" /></button>
+                            <button onClick={() => handleDeletePurchase(msg.id)} className="p-1 text-rose-400 hover:text-rose-600 bg-white rounded-full shadow-sm border border-rose-200"><Trash2 className="w-3 h-3" /></button>
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center justify-end gap-1 mt-1 opacity-70 text-zinc-400">
-                        <span className="text-[10px] leading-none">
-                          {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                    </div>
+                  )
+                }
+
+                // Payment
+                if (msg.type === 'PAYMENT') {
+                  return (
+                    <div key={msg.id} className="flex flex-col items-end w-full mb-1">
+                      <div className="relative max-w-[75%] bg-[#d9fdd3] text-zinc-900 rounded-lg shadow-sm px-2.5 py-1.5 mr-2">
+                        {/* Tail */}
+                        <div className="absolute top-0 -right-2 w-0 h-0 border-t-[10px] border-t-[#d9fdd3] border-r-[10px] border-r-transparent border-b-[10px] border-b-transparent"></div>
+
+                        <div className="flex items-end gap-3">
+                          <p className="text-[15px] leading-snug pt-0.5">
+                            Payment Done: <span className="font-medium">₹{msg.amount}</span>
+                          </p>
+                          <div className="flex items-center gap-1 shrink-0 mb-[1px] text-emerald-700/80 ml-auto">
+                            <span className="text-[10px] leading-none">
+                              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {msg.read 
+                              ? <CheckCheck className="h-3.5 w-3.5 text-blue-500" />
+                              : <CheckCheck className="h-3.5 w-3.5 text-zinc-400" />
+                            }
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              }
-
-              if (msg.type === 'PAYMENT') {
-                return (
-                  <div key={msg.id} className="flex flex-col items-end w-full mb-4">
-                    <div className="max-w-[85%] bg-emerald-700 text-white px-4 py-3 rounded-2xl rounded-tr-sm shadow-sm">
-                      <p className="text-sm font-medium mb-1">
-                        Payment of <span className="font-bold">₹{msg.amount}</span> is successful.
-                      </p>
-                      <p className="text-xs text-emerald-100/90 mb-1">
-                        Customer balance updated.
-                      </p>
-                      <div className="text-[10px] text-emerald-200/80 mt-2 text-right">
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Edit Modal (Inline Overlay) */}
-          {editingMsg && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-              <div className="bg-zinc-50 border border-zinc-200 p-6 rounded-xl w-80 shadow-2xl">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="font-semibold text-zinc-900">Edit Purchase Amount</h4>
-                  <button onClick={() => setEditingMsg(null)} className="text-zinc-400 hover:text-zinc-700"><X className="w-5 h-5"/></button>
-                </div>
-                <form onSubmit={handleEditSubmit}>
-                  <input 
-                    type="number" 
-                    value={editingMsg.amount} 
-                    onChange={e => setEditingMsg({ ...editingMsg, amount: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-white border border-zinc-300 rounded-md px-4 py-2 text-zinc-900 mb-4 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                  <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-md py-2 font-medium">Save Changes</button>
-                </form>
-              </div>
+                  )
+                }
+              })}
+              <div ref={messagesEndRef} />
             </div>
-          )}
 
-          {/* Chat Input */}
-          <div className="p-4 bg-zinc-50 border-t border-zinc-200 shrink-0">
-            <form onSubmit={handleSend} className="flex items-center gap-3">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Type a message to the customer..."
-                className="flex-1 bg-white border border-zinc-200 rounded-full px-5 py-3 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 text-sm"
-              />
-              <button
+            {/* Edit Modal (Inline Overlay) */}
+            {editingMsg && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="bg-zinc-50 border border-zinc-200 p-6 rounded-xl w-80 shadow-2xl">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-semibold text-zinc-900">Edit Purchase Amount</h4>
+                    <button onClick={() => setEditingMsg(null)} className="text-zinc-400 hover:text-zinc-700"><X className="w-5 h-5" /></button>
+                  </div>
+                  <form onSubmit={handleEditSubmit}>
+                    <input
+                      type="number"
+                      value={editingMsg.amount}
+                      onChange={e => setEditingMsg({ ...editingMsg, amount: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-white border border-zinc-300 rounded-md px-4 py-2 text-zinc-900 mb-4 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white rounded-md py-2 font-medium">Save Changes</button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Chat Input */}
+            <div className="px-4 py-3 bg-[#f0f2f5] border-t border-zinc-200 shrink-0">
+              <form onSubmit={handleSend} className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder="Type a message"
+                  className="flex-1 bg-white border-none rounded-lg px-4 py-2.5 text-[15px] text-zinc-900 placeholder:text-zinc-500 focus:outline-none shadow-sm"
+                />
+                <button
                 type="submit"
                 disabled={!inputValue.trim() || isSending}
-                className="w-12 h-12 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 flex items-center justify-center rounded-full text-zinc-900 transition-colors"
+                className="w-10 h-10 bg-[#00a884] hover:bg-[#008f6f] disabled:bg-zinc-300 disabled:opacity-50 transition-colors flex items-center justify-center rounded-full shadow-sm shrink-0"
               >
-                <Send className="w-5 h-5 ml-1" />
+                <SendHorizontal className="w-5 h-5 text-white ml-0.5" />
               </button>
-            </form>
-          </div>
+              </form>
+            </div>
+
+            {/* Modals triggered from Chat Header */}
+            <EditCustomerModal
+              open={isEditModalOpen}
+              onOpenChange={setIsEditModalOpen}
+              customer={{
+                id: selectedCustomer.id,
+                name: selectedCustomer.name,
+                phone: selectedCustomer.phone
+              }}
+              onSuccess={(newData) => {
+                setCustomers(prev => prev.map(c =>
+                  c.id === selectedCustomer.id ? { ...c, name: newData.name, phone: newData.phone } : c
+                ))
+              }}
+            />
+            <RecordPaymentModal
+              open={isPaymentModalOpen}
+              onOpenChange={setIsPaymentModalOpen}
+              customerId={selectedCustomer.id}
+              customerName={selectedCustomer.name || 'Customer'}
+              pendingBalance={selectedCustomer.balance}
+              hideTrigger
+            />
+
           </>
         ) : (
           <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-zinc-100 text-zinc-400 h-full">

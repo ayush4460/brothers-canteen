@@ -1,7 +1,6 @@
 import { verifySession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { FileText, Download } from 'lucide-react'
 
 export default async function VendorStatementsPage() {
@@ -13,64 +12,68 @@ export default async function VendorStatementsPage() {
   })
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-6">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-900 tracking-tight">Generate Statements</h1>
-          <p className="text-zinc-400 mt-1">Download PDF statements of account for any customer.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 tracking-tight">Generate Statements</h1>
+          <p className="text-sm text-zinc-500 mt-1">Download PDF statements of account for any customer.</p>
         </div>
       </div>
 
-      <div className="bg-zinc-50 border border-zinc-200 rounded-xl overflow-x-auto">
-        <table className="w-full min-w-[600px] text-left border-collapse">
-          <thead>
-            <tr className="border-b border-zinc-200 bg-zinc-50/50">
-              <th className="px-6 py-4 text-xs font-semibold text-zinc-400 uppercase tracking-wider">Customer</th>
-              <th className="px-6 py-4 text-xs font-semibold text-zinc-400 uppercase tracking-wider text-right">Outstanding Balance</th>
-              <th className="px-6 py-4 text-xs font-semibold text-zinc-400 uppercase tracking-wider text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800">
-            {customers.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="px-6 py-8 text-center text-zinc-400">
-                  No customers found.
-                </td>
-              </tr>
-            ) : (
-              customers.map(customer => (
-                <tr key={customer.id} className="hover:bg-zinc-200/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                        <FileText className="w-4 h-4 text-indigo-400" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-zinc-900">{customer.name || 'Unnamed'}</div>
-                        <div className="text-sm text-zinc-400">{customer.phone}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className={`font-medium ${customer.currentBalance > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+      <div className="bg-white border border-zinc-200 rounded-xl sm:rounded-2xl shadow-sm overflow-hidden">
+        {customers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center">
+            <div className="w-12 h-12 bg-zinc-100 rounded-full flex items-center justify-center mb-4">
+              <FileText className="w-6 h-6 text-zinc-400" />
+            </div>
+            <h3 className="text-sm font-semibold text-zinc-900">No customers found</h3>
+            <p className="text-sm text-zinc-500 mt-1 max-w-sm">
+              You don't have any customers yet.
+            </p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-zinc-100">
+            {customers.map(customer => (
+              <li key={customer.id} className="group hover:bg-zinc-50 transition-colors p-4 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                
+                {/* Left Side: Avatar/Icon and Details */}
+                <div className="flex items-center gap-3 sm:gap-4 overflow-hidden">
+                  <div className="w-10 h-10 shrink-0 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="flex flex-col truncate">
+                    <span className="font-semibold text-zinc-900 truncate">
+                      {customer.name || 'Unnamed Customer'}
+                    </span>
+                    <span className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+                      {customer.phone}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right Side: Balance and Action */}
+                <div className="flex items-center justify-between sm:justify-end gap-6 sm:w-auto w-full mt-2 sm:mt-0 pl-13 sm:pl-0">
+                  <div className="flex flex-col sm:items-end">
+                    <span className="text-xs text-zinc-500 mb-0.5">Balance</span>
+                    <span className={`font-bold text-sm sm:text-base ${customer.currentBalance > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                       ₹{customer.currentBalance}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <a 
-                      href={`/vendor/customers/${customer.id}/statement`} 
-                      target="_blank"
-                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-200 hover:bg-zinc-700 border border-zinc-300 hover:border-zinc-600 rounded-md text-sm font-medium text-zinc-800 transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      PDF Statement
-                    </a>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  </div>
+                  
+                  <a 
+                    href={`/vendor/customers/${customer.id}/statement`} 
+                    target="_blank"
+                    className="inline-flex shrink-0 items-center gap-2 px-4 py-2 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 rounded-lg text-sm font-medium text-zinc-700 shadow-sm transition-all active:scale-95"
+                  >
+                    <Download className="w-4 h-4 text-zinc-400" />
+                    <span className="hidden sm:inline">Download</span> PDF
+                  </a>
+                </div>
+
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   )

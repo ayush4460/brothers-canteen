@@ -3,6 +3,8 @@
 import { db } from '@/lib/db'
 import { createSession } from '@/lib/session'
 
+const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d?: unknown) => void } } }
+
 export async function requestDeviceApproval(data: {
   phone: string
   deviceId: string
@@ -54,7 +56,9 @@ export async function requestDeviceApproval(data: {
       }
     })
 
-    // TODO: Fire Socket.io event to Vendor Dashboard here!
+    if (globalWithIo.io) {
+      globalWithIo.io.to('vendor_dashboard').emit('new_device_approval')
+    }
 
     return { success: true }
   } catch (error) {

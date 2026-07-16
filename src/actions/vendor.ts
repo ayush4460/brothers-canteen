@@ -2,6 +2,9 @@
 
 import { db } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { createSession, deleteSession } from '@/lib/session'
+
+const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d?: unknown) => void } } }
 
 export async function createCustomer(data: { phone: string; name: string }) {
   try {
@@ -76,11 +79,13 @@ export async function approveDeviceRequest(requestId: string) {
       })
     ])
 
+    revalidatePath('/vendor/approvals')
     revalidatePath('/vendor/dashboard')
     
-    // In a real app we'd trigger a socket event here, but since Next.js server actions 
-    // run differently, we can just let the client handle it or trigger via a small route handler.
-    // For now, the user will poll or we rely on the client WS if implemented.
+    if (globalWithIo.io) {
+      globalWithIo.io.to('vendor_dashboard').emit('device_approval_handled')
+      globalWithIo.io.to(`device_${request.deviceId}`).emit('device_approval_status', { status: 'APPROVED' })
+    }
 
     return { success: true }
   } catch (error) {
@@ -91,12 +96,24 @@ export async function approveDeviceRequest(requestId: string) {
 
 export async function rejectDeviceRequest(requestId: string) {
   try {
-    await db.deviceApprovalRequest.update({
-      where: { id: requestId },
-      data: { status: 'REJECTED' }
+    const request = await db.deviceApprovalRequest.findUnique({
+      where: { id: requestId }
     })
+    
+    if (request) {
+      await db.deviceApprovalRequest.update({
+        where: { id: requestId },
+        data: { status: 'REJECTED' }
+      })
 
-    revalidatePath('/vendor/dashboard')
+      revalidatePath('/vendor/approvals')
+      revalidatePath('/vendor/dashboard')
+
+      if (globalWithIo.io) {
+        globalWithIo.io.to('vendor_dashboard').emit('device_approval_handled')
+        globalWithIo.io.to(`device_${request.deviceId}`).emit('device_approval_status', { status: 'REJECTED' })
+      }
+    }
 
     return { success: true }
   } catch (error) {
@@ -118,5 +135,51 @@ export async function updatePrivateNotes(customerId: string, notes: string) {
   } catch (error) {
     console.error('Update private notes error:', error)
     return { error: 'Failed to update private notes.' }
+  }
+}
+
+export async function editCustomer(customerId: string, data: { name: string, phone: string }) {
+  try {
+    const digitsOnly = data.phone.replace(/\D/g, '')
+    if (digitsOnly.length !== 10) {
+      return { error: 'Please enter a valid 10-digit phone number.' }
+    }
+    const e164Phone = `+91${digitsOnly}`
+
+    const customer = await db.customer.findUnique({ where: { id: customerId } })
+    if (!customer) return { error: 'Customer not found.' }
+
+    if (customer.phone !== e164Phone) {
+      const existing = await db.customer.findUnique({ where: { phone: e164Phone } })
+      if (existing) {
+        return { error: 'A customer with this phone number already exists.' }
+      }
+
+      // Phone number changed: perform transaction to update and clear old sessions/devices
+      await db.$transaction([
+        db.deviceApprovalRequest.deleteMany({ where: { phone: customer.phone } }),
+        db.deviceApprovalRequest.deleteMany({ where: { phone: e164Phone } }),
+        db.session.deleteMany({ where: { customerId } }),
+        db.device.deleteMany({ where: { customerId } }),
+        db.customer.update({
+          where: { id: customerId },
+          data: { name: data.name, phone: e164Phone, updatedAt: BigInt(Date.now()) }
+        })
+      ])
+    } else {
+      await db.customer.update({
+        where: { id: customerId },
+        data: { name: data.name, updatedAt: BigInt(Date.now()) }
+      })
+    }
+
+    revalidatePath('/vendor/customers')
+    revalidatePath('/vendor/dashboard')
+    revalidatePath(`/vendor/customers/${customerId}`)
+
+    return { success: true, phoneChanged: customer.phone !== e164Phone }
+  } catch (error) {
+    console.error('Edit customer error:', error)
+    return { error: 'Failed to edit customer.' }
   }
 }

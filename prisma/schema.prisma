@@ -107,6 +107,7 @@ model Purchase {
   amount             Int
   clearedAmount      Int                  @default(0)
   status             String               // PENDING, UNPAID, PARTIALLY_PAID, PAID, CORRECTED
+  read               Boolean              @default(false)
   paymentAllocations PaymentAllocation[]
   corrections        Correction[]
   createdAt          BigInt
@@ -120,6 +121,7 @@ model Payment {
   amount          Int
   unallocatedAmount Int                @default(0)
   status          String               @default("UNALLOCATED")
+  read            Boolean              @default(false)
   referenceNumber String?
   notes           String?
   recordedBy      String?

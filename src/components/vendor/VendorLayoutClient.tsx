@@ -1,18 +1,39 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Settings, LogOut, FileText, CreditCard, MessageSquare, Menu, X } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { LayoutDashboard, Users, Settings, LogOut, FileText, CreditCard, MessageSquare, Menu, X, ShieldCheck } from 'lucide-react'
+import { io } from 'socket.io-client'
 
-export default function VendorLayoutClient({ children }: { children: React.ReactNode }) {
+export default function VendorLayoutClient({ children, pendingApprovalsCount = 0 }: { children: React.ReactNode, pendingApprovalsCount?: number }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
+  useEffect(() => {
+    const socket = io()
+
+    socket.emit('join_vendor_dashboard')
+
+    socket.on('new_device_approval', () => {
+      router.refresh()
+    })
+
+    socket.on('device_approval_handled', () => {
+      router.refresh()
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [router])
+
   const navLinks = [
-    { href: '/vendor/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/vendor/dashboard', icon: MessageSquare, label: 'Dashboard' },
+    { href: '/vendor/accounts', icon: LayoutDashboard, label: 'Accounts' },
     { href: '/vendor/customers', icon: Users, label: 'Customers' },
-    { href: '/vendor/chat', icon: MessageSquare, label: 'WhatsApp Web' },
+    { href: '/vendor/approvals', icon: ShieldCheck, label: 'Approvals' },
     { href: '/vendor/payments', icon: CreditCard, label: 'Payments' },
     { href: '/vendor/statements', icon: FileText, label: 'Statements' },
   ]
@@ -71,6 +92,11 @@ export default function VendorLayoutClient({ children }: { children: React.React
                   >
                     <Icon className="w-4 h-4" />
                     {link.label}
+                    {link.label === 'Approvals' && pendingApprovalsCount > 0 && (
+                      <span className="ml-auto bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {pendingApprovalsCount}
+                      </span>
+                    )}
                   </Link>
                 </li>
               )
@@ -79,10 +105,7 @@ export default function VendorLayoutClient({ children }: { children: React.React
         </nav>
         
         <div className="p-4 border-t border-zinc-200 shrink-0">
-          <div className="flex items-center gap-3 px-3 py-2 text-sm text-zinc-600 font-medium hover:text-zinc-900 hover:bg-zinc-100 rounded-md cursor-pointer transition-colors">
-            <Settings className="w-4 h-4" />
-            <span>Settings</span>
-          </div>
+
           <button className="w-full flex items-center gap-3 px-3 py-2 mt-2 text-sm text-red-600 font-medium hover:bg-red-50 hover:text-red-700 rounded-md transition-colors">
             <LogOut className="w-4 h-4" />
             <span>Logout</span>
@@ -92,18 +115,9 @@ export default function VendorLayoutClient({ children }: { children: React.React
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden w-full relative">
-        <header className="hidden md:flex h-16 items-center justify-between px-8 border-b border-zinc-200 bg-zinc-50/50 shrink-0">
-          <h2 className="text-lg font-medium truncate capitalize">
-            {pathname.split('/').pop() || 'Overview'}
-          </h2>
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-8 bg-zinc-200 border border-zinc-300 rounded-full flex items-center justify-center text-sm font-medium text-zinc-700 shadow-sm">
-              V
-            </div>
-          </div>
-        </header>
+
         
-        <main className={`flex-1 w-full relative ${pathname === '/vendor/chat' ? 'overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8'}`}>
+        <main className={`flex-1 w-full relative ${pathname === '/vendor/dashboard' ? 'overflow-hidden p-0' : 'overflow-y-auto p-4 md:p-8'}`}>
           {children}
         </main>
       </div>

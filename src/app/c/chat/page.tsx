@@ -38,6 +38,7 @@ export default async function CustomerChatPage() {
       status: p.status,
       timestamp: Number(p.createdAt),
       isSelf: true,
+      read: p.read,
     })),
     ...recentPayments.map(p => ({
       id: p.id,
@@ -46,6 +47,7 @@ export default async function CustomerChatPage() {
       status: 'PAID',
       timestamp: Number(p.createdAt),
       isSelf: false,
+      read: p.read,
     })),
     ...recentTexts.map(t => ({
       id: t.id,
@@ -53,6 +55,7 @@ export default async function CustomerChatPage() {
       text: t.text,
       timestamp: Number(t.createdAt),
       isSelf: false,
+      read: t.read,
     }))
   ].sort((a, b) => a.timestamp - b.timestamp) // Sort chronological
 

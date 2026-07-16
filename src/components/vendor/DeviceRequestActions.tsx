@@ -19,18 +19,18 @@ export function DeviceRequestActions({ requestId }: { requestId: string }) {
   }
 
   return (
-    <div className="flex gap-2 mt-2">
+    <div className="flex gap-3 sm:gap-2 mt-2 sm:mt-0 w-full sm:w-auto">
       <button 
         onClick={handleApprove}
         disabled={loading}
-        className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs py-1.5 rounded-md transition-colors"
+        className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-md transition-colors shadow-sm"
       >
         {loading ? '...' : 'Approve'}
       </button>
       <button 
         onClick={handleReject}
         disabled={loading}
-        className="flex-1 bg-zinc-200 hover:bg-zinc-700 disabled:opacity-50 text-zinc-900 text-xs py-1.5 rounded-md transition-colors"
+        className="flex-1 sm:flex-none bg-zinc-200 hover:bg-zinc-300 disabled:opacity-50 text-zinc-900 text-sm font-medium px-4 py-2 rounded-md transition-colors"
       >
         {loading ? '...' : 'Reject'}
       </button>

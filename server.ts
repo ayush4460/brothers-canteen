@@ -36,9 +36,13 @@ app.prepare().then(() => {
     })
 
     socket.on('join_customer', (customerId) => {
-      if (customerId) {
-        socket.join(`customer_${customerId}`)
-      }
+      socket.join(`customer_${customerId}`)
+      console.log(`Socket joined customer room: customer_${customerId}`)
+    })
+
+    socket.on('join_room', (roomName: string) => {
+      socket.join(roomName)
+      console.log(`Socket joined room: ${roomName}`)
     })
 
     socket.on('disconnect', () => {

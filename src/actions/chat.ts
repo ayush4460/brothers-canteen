@@ -17,9 +17,11 @@ export async function sendChatMessage(customerId: string, text: string) {
 
     const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
     if (globalWithIo.io) {
-      globalWithIo.io.to(`customer_${customerId}`).emit('new_chat_message', {
+      globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('new_chat_message', {
+        customerId,
         id: msg.id,
         text: msg.text,
+        sender: msg.sender,
         timestamp: Number(msg.createdAt)
       })
     }
@@ -62,7 +64,7 @@ export async function deletePurchase(purchaseId: string) {
     const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
     if (globalWithIo.io) {
       const p = await db.purchase.findUnique({ where: { id: purchaseId } })
-      if (p) globalWithIo.io.to(`customer_${p.customerId}`).emit('purchase_deleted', { id: purchaseId })
+      if (p) globalWithIo.io.to(`customer_${p.customerId}`).to('vendor_dashboard').emit('purchase_deleted', { customerId: p.customerId, id: purchaseId })
     }
 
     return { success: true }
@@ -97,12 +99,44 @@ export async function editPurchaseAmount(purchaseId: string, newAmount: number) 
     const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
     if (globalWithIo.io) {
       const p = await db.purchase.findUnique({ where: { id: purchaseId } })
-      if (p) globalWithIo.io.to(`customer_${p.customerId}`).emit('purchase_edited', { id: purchaseId, newAmount })
+      if (p) globalWithIo.io.to(`customer_${p.customerId}`).to('vendor_dashboard').emit('purchase_edited', { customerId: p.customerId, id: purchaseId, newAmount })
     }
 
     return { success: true }
   } catch (error: unknown) {
     console.error('Edit purchase error:', error)
     return { error: 'Failed to edit purchase' }
+  }
+}
+
+export async function markMessagesAsRead(customerId: string, reader: 'VENDOR' | 'CUSTOMER') {
+  try {
+    if (reader === 'VENDOR') {
+      // Vendor is reading, so mark customer's purchases as read
+      await db.purchase.updateMany({
+        where: { customerId, read: false },
+        data: { read: true }
+      })
+    } else {
+      // Customer is reading, so mark vendor's chat messages and payments as read
+      await db.chatMessage.updateMany({
+        where: { customerId, read: false },
+        data: { read: true }
+      })
+      await db.payment.updateMany({
+        where: { customerId, read: false },
+        data: { read: true }
+      })
+    }
+
+    const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d?: unknown) => void } } }
+    if (globalWithIo.io) {
+      globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('messages_read', { customerId, reader })
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to mark messages as read:', error)
+    return { success: false, error: 'Failed to mark messages as read' }
   }
 }

@@ -16,11 +16,36 @@ import {
 } from '@/components/ui/dialog'
 import { CreditCard } from 'lucide-react'
 
-export default function RecordPaymentModal({ customerId, customerName, pendingBalance }: { customerId: string, customerName: string, pendingBalance: number }) {
-  const [open, setOpen] = useState(false)
+export default function RecordPaymentModal({ 
+  customerId, 
+  customerName, 
+  pendingBalance,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  hideTrigger
+}: { 
+  customerId: string
+  customerName: string
+  pendingBalance: number
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  hideTrigger?: boolean
+}) {
+  const [internalOpen, setInternalOpen] = useState(false)
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setOpen = controlledOnOpenChange || setInternalOpen
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen)
+    if (!newOpen) {
+      setAmount('')
+      setError('')
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,30 +72,31 @@ export default function RecordPaymentModal({ customerId, customerName, pendingBa
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {/* @ts-expect-error - asChild missing in Base UI types */}
-      <DialogTrigger asChild>
-        <Button className="bg-indigo-600 hover:bg-indigo-700 text-zinc-900 gap-2 shadow-sm">
-          <CreditCard className="h-4 w-4" />
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      {!hideTrigger && (
+        <DialogTrigger render={
+          <Button className="bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm font-medium px-5" />
+        }>
+          <CreditCard className="h-4 w-4 mr-2" />
           Record Payment
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="bg-zinc-50 border-zinc-200 text-zinc-900 sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle>
-          <DialogDescription className="text-zinc-400">
-            Enter the amount {customerName} paid. This will automatically be allocated via FIFO to their oldest unpaid purchases.
+        </DialogTrigger>
+      )}
+      <DialogContent className="bg-white border-zinc-200/60 shadow-lg text-zinc-900 sm:max-w-[425px] rounded-xl p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-2">
+          <DialogTitle className="text-xl font-semibold">Record Payment</DialogTitle>
+          <DialogDescription className="text-zinc-500 mt-1.5">
+            Enter the payment amount received from {customerName}. This will be deducted from their pending balance.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="bg-white border border-zinc-200 rounded-lg p-4 my-2 text-center">
-          <div className="text-xs text-zinc-400 font-medium">Current Outstanding</div>
-          <div className="text-2xl font-bold text-red-400 mt-1">₹{pendingBalance}</div>
+        <div className="bg-zinc-50/50 border-y border-zinc-100 p-4 text-center">
+          <div className="text-sm text-zinc-500 font-medium">Current Outstanding</div>
+          <div className="text-3xl font-bold text-red-600 mt-1">₹{pendingBalance}</div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="amount" className="text-zinc-800">Amount Received (₹)</Label>
+        <form onSubmit={handleSubmit} className="px-6 pb-6 pt-4 space-y-5">
+          <div className="space-y-1.5">
+            <Label htmlFor="amount" className="text-sm font-medium text-zinc-700">Amount Received (₹)</Label>
             <Input
               id="amount"
               type="number"
@@ -79,28 +105,28 @@ export default function RecordPaymentModal({ customerId, customerName, pendingBa
               min="1"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="bg-white border-zinc-200 text-zinc-900 text-lg h-12"
+              className="bg-zinc-50/50 border-zinc-200/60 text-zinc-900 focus-visible:bg-white focus-visible:ring-1 focus-visible:ring-emerald-500 focus-visible:border-emerald-500 transition-all rounded-lg h-12 text-lg font-medium"
             />
           </div>
           
           {error && (
-            <div className="text-red-500 text-sm font-medium bg-red-950/50 p-3 rounded-md border border-red-900/50">
+            <div className="text-red-600 text-sm font-medium bg-red-50 p-3 rounded-lg border border-red-100">
               {error}
             </div>
           )}
-          <DialogFooter className="pt-4">
+          <DialogFooter className="pt-2">
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => setOpen(false)}
-              className="border-zinc-300 text-zinc-700 hover:bg-zinc-200"
+              onClick={() => handleOpenChange(false)}
+              className="border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg font-medium"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={loading || !amount}
-              className="bg-indigo-600 text-zinc-900 hover:bg-indigo-700"
+              className="bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg font-medium"
             >
               {loading ? 'Processing...' : 'Confirm Payment'}
             </Button>

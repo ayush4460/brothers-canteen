@@ -1,6 +1,7 @@
 import { verifySession } from '@/lib/session'
 import { redirect } from 'next/navigation'
 import VendorLayoutClient from '@/components/vendor/VendorLayoutClient'
+import { db } from '@/lib/db'
 
 export default async function VendorLayout({
   children,
@@ -13,5 +14,9 @@ export default async function VendorLayout({
     redirect('/login')
   }
 
-  return <VendorLayoutClient>{children}</VendorLayoutClient>
+  const pendingApprovalsCount = await db.deviceApprovalRequest.count({
+    where: { status: 'PENDING' }
+  })
+
+  return <VendorLayoutClient pendingApprovalsCount={pendingApprovalsCount}>{children}</VendorLayoutClient>
 }

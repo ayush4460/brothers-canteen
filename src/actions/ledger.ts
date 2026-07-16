@@ -80,10 +80,14 @@ export async function addPurchase(customerId: string, amount: number) {
     revalidatePath(`/vendor/customers`)
     revalidatePath(`/vendor/dashboard`)
 
-    // TODO: Broadcast Socket.io event to Customer app
     const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
     if (globalWithIo.io) {
-      globalWithIo.io.to(`customer_${customerId}`).emit('new_purchase', { amount })
+      globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('new_purchase', {
+        customerId,
+        id: purchaseId,
+        amount,
+        timestamp: Number(now)
+      })
     }
 
     return { success: true }
@@ -219,7 +223,8 @@ export async function addPayment(customerId: string, amount: number) {
 
     const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
     if (globalWithIo.io) {
-      globalWithIo.io.to(`customer_${customerId}`).emit('new_payment', { 
+      globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('new_payment', { 
+        customerId,
         id: paymentId,
         amount, 
         newBalance,
