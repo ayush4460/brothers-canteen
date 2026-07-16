@@ -68,6 +68,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
   }, [router])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [activeMsgId, setActiveMsgId] = useState<string | null>(null)
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId)
 
@@ -450,8 +451,12 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
                 if (msg.type === 'PURCHASE') {
                   const isCancelled = msg.status === 'CANCELLED'
                   return (
-                    <div key={msg.id} className="flex flex-col items-start w-full mb-1">
-                      <div className={`relative max-w-[75%] rounded-lg shadow-sm px-2.5 py-1.5 ml-2 group ${isCancelled ? 'bg-zinc-50 text-zinc-400' : 'bg-white text-zinc-900'}`}>
+                    <div 
+                      key={msg.id} 
+                      className="flex flex-col items-start w-full mb-1 group"
+                      onClick={() => setActiveMsgId(activeMsgId === msg.id ? null : msg.id)}
+                    >
+                      <div className={`relative max-w-[75%] rounded-lg shadow-sm px-2.5 py-1.5 ml-2 ${isCancelled ? 'bg-zinc-50 text-zinc-400' : 'bg-white text-zinc-900'}`}>
                         {/* Tail */}
                         <div className={`absolute top-0 -left-2 w-0 h-0 border-t-[10px] border-l-[10px] border-l-transparent border-b-[10px] border-b-transparent ${isCancelled ? 'border-t-zinc-50' : 'border-t-white'}`}></div>
 
@@ -467,9 +472,9 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
                         </div>
 
                         {!isCancelled && (
-                          <div className="hidden group-hover:flex items-center gap-1 absolute -right-14 top-1 z-10">
-                            <button onClick={() => setEditingMsg({ id: msg.id, amount: msg.amount || 0 })} className="p-1 text-zinc-400 hover:text-zinc-700 bg-white rounded-full shadow-sm border border-zinc-200"><Edit2 className="w-3 h-3" /></button>
-                            <button onClick={() => handleDeletePurchase(msg.id)} className="p-1 text-rose-400 hover:text-rose-600 bg-white rounded-full shadow-sm border border-rose-200"><Trash2 className="w-3 h-3" /></button>
+                          <div className={`items-center gap-1 absolute -right-[4.5rem] top-1 z-10 ${activeMsgId === msg.id ? 'flex' : 'hidden group-hover:flex'}`}>
+                            <button onClick={(e) => { e.stopPropagation(); setEditingMsg({ id: msg.id, amount: msg.amount || 0 }); setActiveMsgId(null); }} className="p-1 text-zinc-400 hover:text-zinc-700 bg-white rounded-full shadow-sm border border-zinc-200"><Edit2 className="w-3 h-3" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeletePurchase(msg.id); setActiveMsgId(null); }} className="p-1 text-rose-400 hover:text-rose-600 bg-white rounded-full shadow-sm border border-rose-200"><Trash2 className="w-3 h-3" /></button>
                           </div>
                         )}
                       </div>
