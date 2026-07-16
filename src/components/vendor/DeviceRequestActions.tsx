@@ -2,11 +2,12 @@
 
 import { approveDeviceRequest, rejectDeviceRequest } from '@/actions/vendor'
 import { useState } from 'react'
-
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
 export function DeviceRequestActions({ requestId }: { requestId: string }) {
   const [actionLoading, setActionLoading] = useState<'approve' | 'reject' | null>(null)
+  const router = useRouter()
 
   const handleApprove = async () => {
     setActionLoading('approve')
@@ -15,6 +16,7 @@ export function DeviceRequestActions({ requestId }: { requestId: string }) {
       toast.error(res.error)
     } else {
       toast.success('Device approved!')
+      router.refresh()
     }
     setActionLoading(null)
   }
@@ -26,6 +28,7 @@ export function DeviceRequestActions({ requestId }: { requestId: string }) {
       toast.error(res.error)
     } else {
       toast.success('Device rejected!')
+      router.refresh()
     }
     setActionLoading(null)
   }

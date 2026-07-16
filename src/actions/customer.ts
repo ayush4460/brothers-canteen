@@ -32,11 +32,11 @@ export async function requestDeviceApproval(data: {
     }
 
     // Check for an existing approved device
-    const existingDevice = await db.device.findFirst({
-      where: { id: data.deviceId, customer: { phone: e164Phone } }
+    const existingDevice = await db.device.findUnique({
+      where: { id: data.deviceId }
     })
 
-    if (existingDevice) {
+    if (existingDevice && existingDevice.customerId === customer.id) {
       // Create session for the customer
       await createSession(undefined, customer.id, existingDevice.id, data.ip, data.browser)
       return { success: true, redirect: '/c/chat' }
