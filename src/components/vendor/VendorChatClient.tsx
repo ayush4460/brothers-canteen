@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Send, SendHorizontal, CheckCheck, Search, MoreVertical, Edit2, Trash2, X } from 'lucide-react'
 import { io } from 'socket.io-client'
 import { sendChatMessage, deletePurchase, editPurchaseAmount, markMessagesAsRead } from '@/actions/chat'
@@ -38,6 +39,21 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    setCustomers(initialCustomers)
+  }, [initialCustomers])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        router.refresh()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [router])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -72,6 +88,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
 
     socket.on('connect', () => {
       socket.emit('join_vendor_dashboard')
+      router.refresh() // Fetch any messages missed while disconnected
     })
 
     socket.on('new_purchase', (data: { customerId: string, id: string, amount: number, timestamp: number }) => {

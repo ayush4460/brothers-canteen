@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { addPurchase } from '@/actions/ledger'
 import { SendHorizontal, Check, CheckCheck, Clock, WifiOff, Coffee, LogOut } from 'lucide-react'
 import { io } from 'socket.io-client'
@@ -32,6 +33,22 @@ export default function ChatInterface({
   const [isSending, setIsSending] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    setMessages(initialMessages)
+    setBalance(initialBalance)
+  }, [initialMessages, initialBalance])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        router.refresh()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [router])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -62,6 +79,7 @@ export default function ChatInterface({
 
     socket.on('connect', () => {
       socket.emit('join_customer', customerId)
+      router.refresh() // Fetch any messages missed while disconnected
     })
 
     socket.on('new_payment', (data: { id: string, amount: number, newBalance: number, timestamp: number }) => {
