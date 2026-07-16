@@ -15,7 +15,7 @@ export async function sendChatMessage(customerId: string, text: string) {
       }
     })
 
-    const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
+    const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('new_chat_message', {
         customerId,
@@ -61,7 +61,7 @@ export async function deletePurchase(purchaseId: string) {
       // We should ideally nullify ledger entry, but keeping it simple for WhatsApp style deletion
     })
 
-    const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
+    const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       const p = await db.purchase.findUnique({ where: { id: purchaseId } })
       if (p) globalWithIo.io.to(`customer_${p.customerId}`).to('vendor_dashboard').emit('purchase_deleted', { customerId: p.customerId, id: purchaseId })
@@ -96,7 +96,7 @@ export async function editPurchaseAmount(purchaseId: string, newAmount: number) 
       })
     })
 
-    const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d: unknown) => void } } }
+    const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       const p = await db.purchase.findUnique({ where: { id: purchaseId } })
       if (p) globalWithIo.io.to(`customer_${p.customerId}`).to('vendor_dashboard').emit('purchase_edited', { customerId: p.customerId, id: purchaseId, newAmount })
@@ -129,7 +129,7 @@ export async function markMessagesAsRead(customerId: string, reader: 'VENDOR' | 
       })
     }
 
-    const globalWithIo = global as typeof globalThis & { io?: { to: (r: string) => { emit: (e: string, d?: unknown) => void } } }
+    const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('messages_read', { customerId, reader })
     }
