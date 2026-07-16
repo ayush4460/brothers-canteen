@@ -68,8 +68,10 @@ export async function approveDeviceRequest(requestId: string) {
           status: 'APPROVED'
         }
       }),
-      db.device.create({
-        data: {
+      db.device.upsert({
+        where: { id: request.deviceId },
+        update: { updatedAt: BigInt(Date.now()) },
+        create: {
           id: request.deviceId,
           customerId: customer.id,
           fingerprint: request.deviceId,

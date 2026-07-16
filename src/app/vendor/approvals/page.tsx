@@ -64,7 +64,7 @@ export default async function ApprovalsPage() {
                           <span className="text-sm text-zinc-600 break-words line-clamp-2 sm:line-clamp-none">{req.browser} on {req.os}</span>
                           <span className="hidden sm:inline text-zinc-300">•</span>
                           <span className="text-xs sm:text-sm text-zinc-500 font-medium">
-                            {new Date(Number(req.requestedAt)).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                            {new Date(Number(req.requestedAt)).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}
                           </span>
                         </div>
                       </div>
