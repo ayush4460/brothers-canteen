@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { io } from 'socket.io-client'
 import { useRouter } from 'next/navigation'
-import { requestDeviceApproval } from '@/actions/customer'
+import { requestDeviceApproval, checkDeviceApprovalStatus } from '@/actions/customer'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,6 +52,8 @@ export default function CustomerLoginForm() {
       const socket = io()
       const deviceId = localStorage.getItem('deviceId')
       
+      let pollInterval: NodeJS.Timeout;
+
       if (deviceId) {
         socket.on('connect', () => {
           socket.emit('join_room', `device_${deviceId}`)
@@ -59,9 +61,8 @@ export default function CustomerLoginForm() {
         
         socket.emit('join_room', `device_${deviceId}`)
         
-        socket.on('device_approval_status', async (data: { status: string }) => {
-          if (data.status === 'APPROVED') {
-            // Re-trigger the submit logic to finalize login and get the redirect
+        const handleStatus = async (statusStr: string) => {
+          if (statusStr === 'APPROVED') {
             const res = await requestDeviceApproval({
               phone,
               deviceId,
@@ -72,16 +73,28 @@ export default function CustomerLoginForm() {
             if (res.redirect) {
               router.push(res.redirect)
             }
-          } else if (data.status === 'REJECTED') {
+          } else if (statusStr === 'REJECTED') {
             setStatus('ERROR')
             setErrorMsg('Your request was rejected by the vendor.')
             socket.disconnect()
+            if (pollInterval) clearInterval(pollInterval)
           }
-        })
+        }
+
+        socket.on('device_approval_status', (data: { status: string }) => handleStatus(data.status))
+
+        // Vercel Fallback Polling
+        pollInterval = setInterval(async () => {
+          const res = await checkDeviceApprovalStatus(deviceId)
+          if (res.status === 'APPROVED' || res.status === 'REJECTED') {
+            handleStatus(res.status)
+          }
+        }, 3000)
       }
       
       return () => {
         socket.disconnect()
+        if (pollInterval) clearInterval(pollInterval)
       }
     }
   }, [status, phone, router])

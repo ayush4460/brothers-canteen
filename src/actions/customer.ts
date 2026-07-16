@@ -71,3 +71,15 @@ export async function requestDeviceApproval(data: {
 export async function forceRefreshCustomer() {
   revalidatePath('/c', 'layout')
 }
+
+export async function checkDeviceApprovalStatus(deviceId: string) {
+  try {
+    const request = await db.deviceApprovalRequest.findUnique({
+      where: { id: deviceId }
+    })
+    if (!request) return { status: null }
+    return { status: request.status }
+  } catch (e) {
+    return { status: null }
+  }
+}

@@ -45,6 +45,11 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
       })
     })
 
+    // Vercel Fallback Polling (since WebSockets don't work in Vercel Serverless)
+    const pollInterval = setInterval(() => {
+      handleRefresh()
+    }, 5000)
+
     socket.on('connect', () => {
       socket.emit('join_vendor_dashboard')
       handleRefresh()
@@ -62,6 +67,7 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
 
     return () => {
       socket.disconnect()
+      clearInterval(pollInterval)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleRefresh)
       window.removeEventListener('online', handleRefresh)

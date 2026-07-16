@@ -54,16 +54,22 @@ export default function ChatInterface({
         handleRefresh()
       }
     }
+    // Vercel Fallback Polling
+    const pollInterval = setInterval(() => {
+      handleRefresh()
+    }, 5000)
+
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('focus', handleRefresh)
     window.addEventListener('online', handleRefresh)
 
     return () => {
+      clearInterval(pollInterval)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('focus', handleRefresh)
       window.removeEventListener('online', handleRefresh)
     }
-  }, [router])
+  }, [router, customerId])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
