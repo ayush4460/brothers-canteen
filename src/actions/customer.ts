@@ -74,8 +74,9 @@ export async function forceRefreshCustomer() {
 
 export async function checkDeviceApprovalStatus(deviceId: string) {
   try {
-    const request = await db.deviceApprovalRequest.findUnique({
-      where: { id: deviceId }
+    const request = await db.deviceApprovalRequest.findFirst({
+      where: { deviceId },
+      orderBy: { requestedAt: 'desc' }
     })
     if (!request) return { status: null }
     return { status: request.status }
