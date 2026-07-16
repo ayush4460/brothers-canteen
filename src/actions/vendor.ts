@@ -186,4 +186,6 @@ export async function editCustomer(customerId: string, data: { name: string, pho
 
 export async function forceRefreshVendor() {
   revalidatePath('/vendor', 'layout')
+  revalidatePath('/vendor/approvals')
+  revalidatePath('/vendor/dashboard')
 }

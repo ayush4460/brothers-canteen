@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Users, Settings, LogOut, FileText, CreditCard, MessageSquare, Menu, X, ShieldCheck } from 'lucide-react'
+import { toast } from 'sonner'
 import { io } from 'socket.io-client'
 import { forceRefreshVendor } from '@/actions/vendor'
 
@@ -11,6 +12,7 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
     const socket = io()
@@ -18,7 +20,9 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
     socket.emit('join_vendor_dashboard')
 
     const handleRefresh = () => {
-      forceRefreshVendor().then(() => router.refresh())
+      startTransition(() => {
+        forceRefreshVendor().then(() => router.refresh())
+      })
     }
 
     const events = [
@@ -34,6 +38,9 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
     
     events.forEach(ev => {
       socket.on(ev, () => {
+        if (ev === 'new_device_approval') {
+          toast.success("New device approval request received!")
+        }
         handleRefresh()
       })
     })
