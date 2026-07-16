@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Users, Settings, LogOut, FileText, CreditCard, MessageSquare, Menu, X, ShieldCheck } from 'lucide-react'
 import { io } from 'socket.io-client'
+import { forceRefreshVendor } from '@/actions/vendor'
 
 export default function VendorLayoutClient({ children, pendingApprovalsCount = 0 }: { children: React.ReactNode, pendingApprovalsCount?: number }) {
   const pathname = usePathname()
@@ -26,19 +27,28 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
 
     socket.on('connect', () => {
       socket.emit('join_vendor_dashboard')
-      router.refresh()
+      forceRefreshVendor().then(() => router.refresh())
     })
+
+    const handleRefresh = () => {
+      forceRefreshVendor().then(() => router.refresh())
+    }
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        router.refresh()
+        handleRefresh()
       }
     }
+    
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleRefresh)
+    window.addEventListener('online', handleRefresh)
 
     return () => {
       socket.disconnect()
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleRefresh)
+      window.removeEventListener('online', handleRefresh)
     }
   }, [router])
 
