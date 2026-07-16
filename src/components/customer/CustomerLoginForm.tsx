@@ -79,8 +79,14 @@ export default function CustomerLoginForm() {
             if (res.redirect) {
               router.push(res.redirect)
             } else if (res.error) {
+              isHandling = false;
               setStatus('ERROR')
               setErrorMsg(res.error)
+            } else {
+              // Failsafe: if the backend returned success but no redirect, we reset the handler to allow retry.
+              isHandling = false;
+              setStatus('ERROR')
+              setErrorMsg('Connection to server timed out. Please refresh and try again.')
             }
           } else if (statusStr === 'REJECTED') {
             if (pollInterval) clearInterval(pollInterval)
