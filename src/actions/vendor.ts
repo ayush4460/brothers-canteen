@@ -70,7 +70,10 @@ export async function approveDeviceRequest(requestId: string) {
       }),
       db.device.upsert({
         where: { id: request.deviceId },
-        update: { updatedAt: BigInt(Date.now()) },
+        update: { 
+          updatedAt: BigInt(Date.now()),
+          customerId: customer.id 
+        },
         create: {
           id: request.deviceId,
           customerId: customer.id,
