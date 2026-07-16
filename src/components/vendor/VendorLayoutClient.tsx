@@ -24,8 +24,21 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
       router.refresh()
     })
 
+    socket.on('connect', () => {
+      socket.emit('join_vendor_dashboard')
+      router.refresh()
+    })
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        router.refresh()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
       socket.disconnect()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [router])
 
