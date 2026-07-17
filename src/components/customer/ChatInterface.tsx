@@ -212,10 +212,7 @@ export default function ChatInterface({
           <WifiOff className="h-3 w-3" /> You are offline
         </div>
       )}
-      <div className="bg-emerald-50 px-4 py-3 border-b border-emerald-100 shrink-0 text-center relative z-20 shadow-sm">
-        <p className="text-xs text-emerald-700/70 font-medium uppercase tracking-wider mb-0.5">Pending Balance</p>
-        <p className="text-xl font-bold text-emerald-600 tracking-tight">₹{balance}</p>
-      </div>
+
 
       <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#efeae2]">
         {messages.length === 0 ? (
