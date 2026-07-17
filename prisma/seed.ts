@@ -13,8 +13,8 @@ const adapter = new PrismaPg(pool)
 const prisma = new PrismaClient({ adapter })
 
 async function main() {
-  const adminEmail = 'tahir@gmail.com'
-  const defaultPassword = 'Patterns@123'
+  const adminEmail = process.env.ADMIN_EMAIL! || ''
+  const defaultPassword = process.env.ADMIN_PASSWORD! || ''
   const hash = await bcrypt.hash(defaultPassword, 10)
 
   const now = BigInt(Date.now())
