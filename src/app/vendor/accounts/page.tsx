@@ -12,6 +12,23 @@ export default async function VendorDashboard() {
   const allCustomers = await db.customer.findMany({ select: { currentBalance: true }})
   const totalPending = allCustomers.reduce((acc, c) => acc + c.currentBalance, 0)
 
+  // Dynamic daily stats
+  const startOfDay = BigInt(new Date().setHours(0, 0, 0, 0))
+  
+  const newCustomersToday = await db.customer.count({
+    where: { archivedAt: null, createdAt: { gte: startOfDay } }
+  })
+
+  const todayPayments = await db.payment.aggregate({
+    where: { createdAt: { gte: startOfDay } },
+    _sum: { amount: true }
+  })
+  const collectionsToday = todayPayments._sum.amount || 0
+  
+  const todayPaymentsCount = await db.payment.count({
+    where: { createdAt: { gte: startOfDay } }
+  })
+
   // Fetch real pending requests
   const pendingRequests = await db.deviceApprovalRequest.findMany({
     where: { status: 'PENDING' },
@@ -47,7 +64,11 @@ export default async function VendorDashboard() {
           <CardContent>
             <div className="text-3xl font-bold text-zinc-900 tracking-tight">{customersCount}</div>
             <p className="text-sm text-zinc-500 mt-1">
-              <span className="text-emerald-600 font-medium">+2</span> from yesterday
+              {newCustomersToday > 0 ? (
+                <><span className="text-emerald-600 font-medium">+{newCustomersToday}</span> from today</>
+              ) : (
+                'No new customers today'
+              )}
             </p>
           </CardContent>
         </Card>
@@ -60,9 +81,9 @@ export default async function VendorDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-zinc-900 tracking-tight">₹0</div>
+            <div className="text-3xl font-bold text-zinc-900 tracking-tight">₹{collectionsToday}</div>
             <p className="text-sm text-zinc-500 mt-1">
-              0 payments recorded today
+              {todayPaymentsCount} payment{todayPaymentsCount === 1 ? '' : 's'} recorded today
             </p>
           </CardContent>
         </Card>
