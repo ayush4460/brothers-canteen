@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Brothers Canteen",
   description: "Manage your canteen accounts and payments easily.",
+  appleWebApp: {
+    capable: true,
+    title: "Brothers Canteen",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({

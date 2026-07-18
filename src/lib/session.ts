@@ -27,6 +27,7 @@ export async function createSession(vendorId?: string, customerId?: string, devi
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     expires: new Date(Number(expiresAt)),
+    maxAge: 30 * 24 * 60 * 60, // 30 days
     sameSite: 'lax',
     path: '/',
   })
