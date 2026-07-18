@@ -1,7 +1,12 @@
 import CustomerLoginForm from '@/components/customer/CustomerLoginForm'
 import { Coffee } from 'lucide-react'
+import { verifySession } from '@/lib/session'
+import { redirect } from 'next/navigation'
 
-export default function CustomerLoginPage() {
+export default async function CustomerLoginPage() {
+  const auth = await verifySession()
+  if (auth.isAuth && auth.customer) redirect('/c/chat')
+
   return (
     <div className="min-h-screen bg-[#f0f2f5] relative flex flex-col font-sans">
       {/* Top Green Banner */}

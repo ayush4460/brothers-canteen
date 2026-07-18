@@ -1,6 +1,11 @@
-import LoginForm from '@/components/vendor/LoginForm'
+import VendorLoginForm from '@/components/vendor/LoginForm'
+import { verifySession } from '@/lib/session'
+import { redirect } from 'next/navigation'
 
-export default function VendorLoginPage() {
+export default async function VendorLoginPage() {
+  const auth = await verifySession()
+  if (auth.isAuth && auth.vendor) redirect('/vendor/dashboard')
+
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-50/50 px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8 bg-white p-8 sm:p-10 rounded-2xl shadow-sm border border-zinc-200/60">
