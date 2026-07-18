@@ -17,7 +17,7 @@ export default async function VendorLoginPage() {
             Sign in to the Vendor Dashboard
           </p>
         </div>
-        <LoginForm />
+        <VendorLoginForm />
       </div>
     </div>
   )
