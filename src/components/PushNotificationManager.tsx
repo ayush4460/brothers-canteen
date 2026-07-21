@@ -101,7 +101,17 @@ export function PushNotificationManager({ className }: { className?: string }) {
     }
   }
 
-  if (!isSupported) return null
+  if (!isSupported) {
+    return (
+      <button 
+        onClick={() => toast.error('To enable notifications on iPhone, please tap Share -> "Add to Home Screen" first.')}
+        className={`p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 rounded-full transition-colors ${className}`}
+        title="Notifications not supported in this browser"
+      >
+        <BellOff className="w-5 h-5 opacity-50" />
+      </button>
+    )
+  }
 
   if (subscription) {
     return (
