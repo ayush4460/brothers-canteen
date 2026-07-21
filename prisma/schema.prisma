@@ -11,6 +11,7 @@ model Vendor {
   email        String    @unique
   passwordHash String
   sessions     Session[]
+  pushSubscriptions PushSubscription[]
   createdAt    BigInt
   updatedAt    BigInt
 }
@@ -29,6 +30,7 @@ model Customer {
 
   devices        Device[]
   sessions       Session[]
+  pushSubscriptions PushSubscription[]
   timelineEvents TimelineEvent[]
   ledgerEntries  LedgerEntry[]
   purchases      Purchase[]
@@ -223,5 +225,17 @@ model ChatMessage {
   sender     String   // VENDOR
   text       String
   read       Boolean  @default(false)
+  createdAt  BigInt
+}
+
+model PushSubscription {
+  id         String    @id @default(cuid())
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+  vendorId   String?
+  vendor     Vendor?   @relation(fields: [vendorId], references: [id])
   createdAt  BigInt
 }

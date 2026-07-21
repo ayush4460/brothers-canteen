@@ -7,6 +7,7 @@ import { addPurchase } from '@/actions/ledger'
 import { SendHorizontal, Check, CheckCheck, Clock, WifiOff, Coffee, LogOut } from 'lucide-react'
 import { io } from 'socket.io-client'
 import { markMessagesAsRead } from '@/actions/chat'
+import { PushNotificationManager } from '@/components/PushNotificationManager'
 
 type Message = {
   id: string
@@ -198,7 +199,8 @@ export default function ChatInterface({
             <p className="text-[10px] text-emerald-500 font-medium tracking-wider uppercase">Open</p>
           </div>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-1">
+          <PushNotificationManager />
           <form action="/api/auth/logout" method="POST">
             <button type="submit" className="text-zinc-400 hover:text-zinc-900 p-2 transition-colors">
               <LogOut className="h-4 w-4" />

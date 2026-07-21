@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Users, Settings, LogOut, FileText, CreditCard, MessageSquare, Menu, X, ShieldCheck } from 'lucide-react'
+import { PushNotificationManager } from '@/components/PushNotificationManager'
 import { toast } from 'sonner'
 import { io } from 'socket.io-client'
 import { forceRefreshVendor } from '@/actions/vendor'
@@ -89,12 +90,15 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between h-16 px-4 bg-zinc-50 border-b border-zinc-200 shrink-0">
         <h1 className="text-xl font-bold tracking-tight text-zinc-900">Brothers Canteen</h1>
-        <button 
-          onClick={() => setIsMobileMenuOpen(true)}
+        <div className="flex items-center gap-2">
+          <PushNotificationManager />
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
           className="p-2 -mr-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-200 rounded-md transition-colors"
         >
           <Menu className="w-6 h-6" />
         </button>
+      </div>
       </div>
 
       {/* Sidebar Overlay for Mobile */}
@@ -113,12 +117,15 @@ export default function VendorLayoutClient({ children, pendingApprovalsCount = 0
       `}>
         <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-200 shrink-0">
           <h1 className="text-xl font-bold tracking-tight text-zinc-900">Brothers Canteen</h1>
-          <button 
-            className="md:hidden text-zinc-400 hover:text-zinc-900"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <PushNotificationManager />
+            <button 
+              className="md:hidden text-zinc-400 hover:text-zinc-900"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         
         <nav className="flex-1 overflow-y-auto py-4">

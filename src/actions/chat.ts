@@ -2,6 +2,7 @@
 
 import { db } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
+import { sendNotification } from '@/actions/push'
 
 export async function sendChatMessage(customerId: string, text: string) {
   try {
@@ -15,6 +16,16 @@ export async function sendChatMessage(customerId: string, text: string) {
       }
     })
 
+    // Send push notification to the customer
+    await sendNotification(
+      customerId, 
+      'customer', 
+      'Brothers Canteen', 
+      text, 
+      '/c/chat'
+    )
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('new_chat_message', {
@@ -61,6 +72,7 @@ export async function deletePurchase(purchaseId: string) {
       // We should ideally nullify ledger entry, but keeping it simple for WhatsApp style deletion
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       const p = await db.purchase.findUnique({ where: { id: purchaseId } })
@@ -96,6 +108,7 @@ export async function editPurchaseAmount(purchaseId: string, newAmount: number) 
       })
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       const p = await db.purchase.findUnique({ where: { id: purchaseId } })
@@ -129,6 +142,7 @@ export async function markMessagesAsRead(customerId: string, reader: 'VENDOR' | 
       })
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('messages_read', { customerId, reader })

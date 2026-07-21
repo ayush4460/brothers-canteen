@@ -61,6 +61,15 @@ export async function requestDeviceApproval(data: {
       globalWithIo.io.to('vendor_dashboard').emit('new_device_approval')
     }
 
+    const { sendNotification } = await import('@/actions/push')
+    await sendNotification(
+      'all_vendors',
+      'vendor',
+      'Login Request',
+      `A new device requested access for ${customer.name || customer.phone}`,
+      '/vendor/approvals'
+    )
+
     return { success: true }
   } catch (error) {
     console.error('Request device error:', error)

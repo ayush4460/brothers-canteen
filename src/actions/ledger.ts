@@ -90,6 +90,16 @@ export async function addPurchase(customerId: string, amount: number) {
       })
     }
 
+    const { sendNotification } = await import('@/actions/push')
+    const c = await db.customer.findUnique({ where: { id: customerId } })
+    await sendNotification(
+      'all_vendors', 
+      'vendor', 
+      'New Purchase', 
+      `${c?.name || c?.phone || 'Customer'} added a purchase of ₹${amount}`, 
+      '/vendor/dashboard'
+    )
+
     return { success: true }
   } catch (error: unknown) {
     console.error('Add purchase error:', error)
@@ -231,6 +241,15 @@ export async function addPayment(customerId: string, amount: number) {
         timestamp: Number(now)
       })
     }
+
+    const { sendNotification } = await import('@/actions/push')
+    await sendNotification(
+      customerId, 
+      'customer', 
+      'Payment Received', 
+      `A payment of ₹${amount} was recorded. Your new balance is ₹${newBalance}.`, 
+      '/c/chat'
+    )
 
     return { success: true }
   } catch (error: unknown) {
