@@ -75,11 +75,12 @@ export async function addPurchase(customerId: string, amount: number) {
         where: { id: customerId },
         data: { currentBalance: newBalance, updatedAt: now }
       })
-    })
+    }, { timeout: 20000 })
 
     revalidatePath(`/vendor/customers`)
     revalidatePath(`/vendor/dashboard`)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('new_purchase', {
@@ -226,11 +227,12 @@ export async function addPayment(customerId: string, amount: number) {
           updatedAt: now 
         }
       })
-    })
+    }, { timeout: 20000 })
 
     revalidatePath(`/vendor/customers`)
     revalidatePath(`/vendor/dashboard`)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const globalWithIo = global as typeof globalThis & { io?: any }
     if (globalWithIo.io) {
       globalWithIo.io.to(`customer_${customerId}`).to('vendor_dashboard').emit('new_payment', { 
