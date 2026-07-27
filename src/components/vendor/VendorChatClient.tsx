@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { forceRefreshVendor } from '@/actions/vendor'
 import { Send, SendHorizontal, CheckCheck, Search, MoreVertical, Edit2, Trash2, X } from 'lucide-react'
@@ -42,9 +42,6 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const router = useRouter()
 
-  useEffect(() => {
-    setCustomers(initialCustomers)
-  }, [initialCustomers])
 
   useEffect(() => {
     const handleRefresh = () => {
@@ -72,7 +69,13 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId)
 
-  const filteredCustomers = customers.filter(c =>
+  // Derive displayed customers — zero out unread for the currently open chat without mutating state
+  const displayCustomers = useMemo(() =>
+    customers.map(c => c.id === selectedCustomerId ? { ...c, unreadCount: 0 } : c),
+    [customers, selectedCustomerId]
+  )
+
+  const filteredCustomers = displayCustomers.filter(c =>
     c.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.phone.includes(searchQuery)
   )
@@ -87,11 +90,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
 
   useEffect(() => {
     if (selectedCustomerId) {
-      // Clear unread count locally
-      setCustomers(prev => prev.map(c => 
-        c.id === selectedCustomerId ? { ...c, unreadCount: 0 } : c
-      ))
-      // Mark as read on server
+      // Mark as read on server (calling external system — correct useEffect usage)
       markMessagesAsRead(selectedCustomerId, 'VENDOR')
     }
   }, [selectedCustomerId])
