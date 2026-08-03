@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { forceRefreshCustomer } from '@/actions/customer'
 import { addPurchase } from '@/actions/ledger'
-import { SendHorizontal, Check, CheckCheck, Clock, WifiOff, Coffee, LogOut } from 'lucide-react'
+import { SendHorizontal, CheckCheck, Clock, WifiOff, Coffee, LogOut } from 'lucide-react'
 import { io } from 'socket.io-client'
 import { markMessagesAsRead } from '@/actions/chat'
 import { PushNotificationManager } from '@/components/PushNotificationManager'
@@ -30,17 +30,17 @@ export default function ChatInterface({
   initialMessages: Message[]
 }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
+  const [prevInitialMessages, setPrevInitialMessages] = useState(initialMessages)
+  if (initialMessages !== prevInitialMessages) {
+    setPrevInitialMessages(initialMessages)
+    setMessages(initialMessages)
+  }
+
   const [inputValue, setInputValue] = useState('')
-  const [balance, setBalance] = useState(initialBalance)
   const [isSending, setIsSending] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
-
-  useEffect(() => {
-    setMessages(initialMessages)
-    setBalance(initialBalance)
-  }, [initialMessages, initialBalance])
 
   useEffect(() => {
     const handleRefresh = () => {
@@ -115,7 +115,6 @@ export default function ChatInterface({
         isSelf: false
       }
       setMessages(prev => [...prev, newMsg])
-      setBalance(data.newBalance)
     })
 
     socket.on('new_chat_message', (data: { id: string, text: string, timestamp: number }) => {
@@ -148,7 +147,7 @@ export default function ChatInterface({
     return () => {
       socket.disconnect()
     }
-  }, [customerId])
+  }, [customerId, router])
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -177,7 +176,6 @@ export default function ChatInterface({
 
     if (res.success) {
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'UNPAID' } : m))
-      setBalance(prev => prev + amount)
     } else {
       // Revert optimistic update on failure (basic)
       setMessages(prev => prev.filter(m => m.id !== tempId))
@@ -224,14 +222,47 @@ export default function ChatInterface({
             </div>
           </div>
         ) : (
-          messages.map(msg => {
+          messages.map((msg, index) => {
+            const msgDate = new Date(msg.timestamp)
+            const today = new Date()
+            const yesterday = new Date(today)
+            yesterday.setDate(yesterday.getDate() - 1)
+            
+            let dateStr = msgDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+            if (msgDate.toDateString() === today.toDateString()) {
+              dateStr = 'Today'
+            } else if (msgDate.toDateString() === yesterday.toDateString()) {
+              dateStr = 'Yesterday'
+            }
+
+            let showDate = false
+            if (index === 0) {
+              showDate = true
+            } else {
+              const prevMsg = messages[index - 1]
+              const prevDate = new Date(prevMsg.timestamp)
+              if (msgDate.toDateString() !== prevDate.toDateString()) {
+                showDate = true
+              }
+            }
+
+            const dateBadge = showDate ? (
+              <div className="flex justify-center my-3 w-full">
+                <span className="bg-[#e1f3fb] text-zinc-600 text-xs px-3 py-1 rounded-lg shadow-sm border border-[#d1e8f2]">
+                  {dateStr}
+                </span>
+              </div>
+            ) : null;
+
             if (msg.type === 'TEXT') {
               return (
-                <div key={msg.id} className="flex flex-col items-start w-full mb-1">
+                <div key={msg.id} className="w-full flex flex-col">
+                  {dateBadge}
+                  <div className="flex flex-col items-start w-full mb-1">
                   <div className="max-w-[75%] px-3 py-1.5 rounded-lg shadow-sm relative group bg-white">
                     <div className="absolute top-0 -left-2 w-0 h-0 border-[6px] border-transparent border-t-white border-r-white" />
                     <div className="flex items-end gap-3">
-                      <p className="text-[15px] leading-snug break-words pt-0.5">{msg.text}</p>
+                      <p className="text-[15px] leading-snug wrap-break-word pt-0.5">{msg.text}</p>
                       <div className="flex items-center gap-1 shrink-0 opacity-70 mb-0.5">
                         <span className="text-[10px] leading-none">
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -240,12 +271,15 @@ export default function ChatInterface({
                     </div>
                   </div>
                 </div>
+                </div>
               )
             }
 
             if (msg.type === 'PAYMENT') {
               return (
-                <div key={msg.id} className="flex flex-col items-start w-full mb-1">
+                <div key={msg.id} className="w-full flex flex-col">
+                  {dateBadge}
+                  <div className="flex flex-col items-start w-full mb-1">
                   <div className="max-w-[75%] px-3 py-1.5 rounded-lg shadow-sm relative group bg-white">
                     <div className="absolute top-0 -left-2 w-0 h-0 border-[6px] border-transparent border-t-white border-r-white" />
                     <div className="flex items-end gap-3">
@@ -258,6 +292,7 @@ export default function ChatInterface({
                         </span>
                       </div>
                     </div>
+                    </div>
                   </div>
                 </div>
               )
@@ -266,7 +301,9 @@ export default function ChatInterface({
             // PURCHASE
             const isCancelled = msg.status === 'CANCELLED'
             return (
-              <div key={msg.id} className="flex flex-col items-end w-full mb-1">
+              <div key={msg.id} className="w-full flex flex-col">
+                {dateBadge}
+                <div className="flex flex-col items-end w-full mb-1">
                 <div className={`max-w-[75%] px-3 py-1.5 rounded-lg shadow-sm relative group ${
                   isCancelled ? 'bg-zinc-200 text-zinc-600' : 'bg-[#d9fdd3] text-zinc-900'
                 }`}>
@@ -284,13 +321,14 @@ export default function ChatInterface({
                       {!isCancelled && (
                         <>
                           {msg.status === 'PENDING' ? (
-                            <Clock className="h-[12px] w-[12px]" />
+                            <Clock className="h-3 w-3" />
                           ) : (
-                            <CheckCheck className={`h-[14px] w-[14px] ${msg.read ? 'text-blue-500' : 'text-zinc-500'}`} />
+                            <CheckCheck className={`h-3.5 w-3.5 ${msg.read ? 'text-blue-500' : 'text-zinc-500'}`} />
                           )}
                         </>
                       )}
                     </div>
+                  </div>
                   </div>
                 </div>
               </div>

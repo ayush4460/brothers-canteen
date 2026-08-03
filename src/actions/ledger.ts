@@ -16,7 +16,7 @@ function validateAmount(amount: number) {
 /**
  * Adds a new purchase for a customer.
  */
-export async function addPurchase(customerId: string, amount: number) {
+export async function addPurchase(customerId: string, amount: number, sender: 'VENDOR' | 'CUSTOMER' = 'CUSTOMER') {
   validateAmount(amount)
   
   try {
@@ -39,6 +39,7 @@ export async function addPurchase(customerId: string, amount: number) {
           amount,
           clearedAmount: 0,
           status: 'UNPAID',
+          createdBy: sender,
           createdAt: now,
           updatedAt: now,
         }
@@ -87,7 +88,8 @@ export async function addPurchase(customerId: string, amount: number) {
         customerId,
         id: purchaseId,
         amount,
-        timestamp: Number(now)
+        timestamp: Number(now),
+        sender
       })
     }
 

@@ -27,7 +27,7 @@ export default async function VendorChatPage() {
         amount: p.amount,
         status: p.status, // PENDING, UNPAID, CANCELLED, etc.
         timestamp: Number(p.createdAt),
-        isSelf: false, // from customer
+        isSelf: p.createdBy === 'VENDOR', // vendor-created shows on right
         read: p.read
       })),
       ...c.payments.map(p => ({

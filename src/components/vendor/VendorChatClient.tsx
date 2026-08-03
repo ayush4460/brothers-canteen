@@ -6,6 +6,7 @@ import { forceRefreshVendor } from '@/actions/vendor'
 import { Send, SendHorizontal, CheckCheck, Search, MoreVertical, Edit2, Trash2, X } from 'lucide-react'
 import { io } from 'socket.io-client'
 import { sendChatMessage, deletePurchase, editPurchaseAmount, markMessagesAsRead } from '@/actions/chat'
+import { addPurchase } from '@/actions/ledger'
 import RecordPaymentModal from './RecordPaymentModal'
 import EditCustomerModal from './EditCustomerModal'
 
@@ -41,7 +42,21 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const router = useRouter()
+  // Use a ref so the socket closure always reads the latest selectedCustomerId
+  // without needing to reconnect the socket every time it changes
+  const selectedCustomerIdRef = useRef<string | null>(null)
 
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedCustomerIdRef.current = selectedCustomerId
+  }, [selectedCustomerId])
+
+  // Sync state when server refreshes via router.refresh()
+  // eslint-disable-next-line react-compiler/react-compiler
+  useEffect(() => {
+    setCustomers(initialCustomers)
+  }, [initialCustomers])
 
   useEffect(() => {
     const handleRefresh = () => {
@@ -103,8 +118,8 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
       forceRefreshVendor().then(() => router.refresh()) // Fetch any messages missed while disconnected
     })
 
-    socket.on('new_purchase', (data: { customerId: string, id: string, amount: number, timestamp: number }) => {
-      if (selectedCustomerId === data.customerId) {
+    socket.on('new_purchase', (data: { customerId: string, id: string, amount: number, timestamp: number, sender?: string }) => {
+      if (selectedCustomerIdRef.current === data.customerId) {
         markMessagesAsRead(data.customerId, 'VENDOR')
       }
       
@@ -112,16 +127,17 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
         const cIdx = prev.findIndex(c => c.id === data.customerId)
         if (cIdx === -1) return prev
         const newC = { ...prev[cIdx] }
+        if (newC.messages.find(m => m.id === data.id)) return prev;
         newC.messages = [...newC.messages, {
           id: data.id,
           type: 'PURCHASE',
           amount: data.amount,
           status: 'PENDING',
           timestamp: data.timestamp || Date.now(),
-          isSelf: false
+          isSelf: data.sender === 'VENDOR' // vendor-sent shows on right, customer-sent on left
         }]
         newC.balance += data.amount
-        if (selectedCustomerId !== data.customerId) {
+        if (selectedCustomerIdRef.current !== data.customerId) {
           newC.unreadCount += 1
         }
 
@@ -180,7 +196,7 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
           timestamp: data.timestamp || Date.now(),
           isSelf: data.sender === 'VENDOR'
         }]
-        if (selectedCustomerId !== data.customerId && data.sender !== 'VENDOR') {
+        if (selectedCustomerIdRef.current !== data.customerId && data.sender !== 'VENDOR') {
           newC.unreadCount += 1
         }
 
@@ -217,37 +233,52 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
     return () => {
       socket.disconnect()
     }
-  }, [selectedCustomerId])
+  }, []) // Empty deps: socket connects ONCE, uses ref for selectedCustomerId
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedCustomerId || !inputValue.trim() || isSendingRef.current) return
 
     const text = inputValue.trim()
+    const amount = parseInt(text, 10)
+    const isNumeric = /^\d+$/.test(text) && amount > 0
+
     setInputValue('')
     setIsSending(true)
     isSendingRef.current = true
 
-    const res = await sendChatMessage(selectedCustomerId, text)
-    if (res.success && res.message) {
-      const msg = res.message
-      setCustomers(prev => prev.map(c => {
-        if (c.id === selectedCustomerId) {
-          if (c.messages.some(m => m.id === msg.id)) return c;
-          return {
-            ...c,
-            messages: [...c.messages, {
-              id: msg.id,
-              type: 'TEXT',
-              text: msg.text,
-              timestamp: Number(msg.createdAt),
-              isSelf: true
-            }]
+    if (isNumeric) {
+      // Treat as a purchase entry on behalf of the customer — adds to pending balance
+      const res = await addPurchase(selectedCustomerId, amount, 'VENDOR')
+      if (res.success) {
+        // Socket will emit 'new_purchase' and update UI reactively
+      } else {
+        alert(res.error || 'Failed to add purchase.')
+      }
+    } else {
+      // Plain text message
+      const res = await sendChatMessage(selectedCustomerId, text)
+      if (res.success && res.message) {
+        const msg = res.message
+        setCustomers(prev => prev.map(c => {
+          if (c.id === selectedCustomerId) {
+            if (c.messages.some(m => m.id === msg.id)) return c;
+            return {
+              ...c,
+              messages: [...c.messages, {
+                id: msg.id,
+                type: 'TEXT',
+                text: msg.text,
+                timestamp: Number(msg.createdAt),
+                isSelf: true
+              }]
+            }
           }
-        }
-        return c
-      }))
+          return c
+        }))
+      }
     }
+
     setIsSending(false)
     isSendingRef.current = false
   }
@@ -415,12 +446,44 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
 
             {/* Chat Timeline */}
             <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#efeae2]">
-              {selectedCustomer.messages.map(msg => {
+              {selectedCustomer.messages.map((msg, index) => {
+                const msgDate = new Date(msg.timestamp)
+                const today = new Date()
+                const yesterday = new Date(today)
+                yesterday.setDate(yesterday.getDate() - 1)
+                
+                let dateStr = msgDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                if (msgDate.toDateString() === today.toDateString()) {
+                  dateStr = 'Today'
+                } else if (msgDate.toDateString() === yesterday.toDateString()) {
+                  dateStr = 'Yesterday'
+                }
+
+                let showDate = false
+                if (index === 0) {
+                  showDate = true
+                } else {
+                  const prevMsg = selectedCustomer.messages[index - 1]
+                  const prevDate = new Date(prevMsg.timestamp)
+                  if (msgDate.toDateString() !== prevDate.toDateString()) {
+                    showDate = true
+                  }
+                }
+
+                const dateBadge = showDate ? (
+                  <div className="flex justify-center my-3 w-full">
+                    <span className="bg-[#e1f3fb] text-zinc-600 text-xs px-3 py-1 rounded-lg shadow-sm border border-[#d1e8f2]">
+                      {dateStr}
+                    </span>
+                  </div>
+                ) : null;
 
                 if (msg.type === 'TEXT') {
                   return (
-                    <div key={msg.id} className={`flex flex-col w-full mb-1 ${msg.isSelf ? 'items-end' : 'items-start'}`}>
-                      <div className={`relative max-w-[75%] rounded-lg shadow-sm px-2.5 py-1.5 ${msg.isSelf ? 'bg-[#d9fdd3] text-zinc-900 mr-2' : 'bg-white text-zinc-900 ml-2 group'}`}>
+                    <div key={msg.id} className="w-full flex flex-col">
+                      {dateBadge}
+                      <div className={`flex flex-col w-full mb-1 ${msg.isSelf ? 'items-end' : 'items-start'}`}>
+                        <div className={`relative max-w-[75%] rounded-lg shadow-sm px-2.5 py-1.5 ${msg.isSelf ? 'bg-[#d9fdd3] text-zinc-900 mr-2' : 'bg-white text-zinc-900 ml-2 group'}`}>
                         {/* Tail */}
                         {msg.isSelf ? (
                           <div className="absolute top-0 -right-2 w-0 h-0 border-t-[10px] border-t-[#d9fdd3] border-r-[10px] border-r-transparent border-b-[10px] border-b-transparent"></div>
@@ -443,49 +506,63 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
                         </div>
                       </div>
                     </div>
-                  )
+                  </div>
+                )
                 }
 
                 // Purchase
                 if (msg.type === 'PURCHASE') {
                   const isCancelled = msg.status === 'CANCELLED'
                   return (
-                    <div 
-                      key={msg.id} 
-                      className="flex flex-col items-start w-full mb-1 group"
-                      onClick={() => setActiveMsgId(activeMsgId === msg.id ? null : msg.id)}
-                    >
-                      <div className={`relative max-w-[75%] rounded-lg shadow-sm px-2.5 py-1.5 ml-2 ${isCancelled ? 'bg-zinc-50 text-zinc-400' : 'bg-white text-zinc-900'}`}>
+                    <div key={msg.id} className="w-full flex flex-col">
+                      {dateBadge}
+                      <div 
+                        className={`flex flex-col w-full mb-1 group ${msg.isSelf ? 'items-end' : 'items-start'}`}
+                        onClick={() => setActiveMsgId(activeMsgId === msg.id ? null : msg.id)}
+                      >
+                      <div className={`relative max-w-[75%] rounded-lg shadow-sm px-2.5 py-1.5 ${msg.isSelf ? 'mr-2' : 'ml-2'} ${isCancelled ? 'bg-zinc-50 text-zinc-400' : (msg.isSelf ? 'bg-[#d9fdd3] text-zinc-900' : 'bg-white text-zinc-900')}`}>
                         {/* Tail */}
-                        <div className={`absolute top-0 -left-2 w-0 h-0 border-t-[10px] border-l-[10px] border-l-transparent border-b-[10px] border-b-transparent ${isCancelled ? 'border-t-zinc-50' : 'border-t-white'}`}></div>
+                        {msg.isSelf ? (
+                          <div className={`absolute top-0 -right-2 w-0 h-0 border-t-[10px] border-r-[10px] border-r-transparent border-b-[10px] border-b-transparent ${isCancelled ? 'border-t-zinc-50' : 'border-t-[#d9fdd3]'}`}></div>
+                        ) : (
+                          <div className={`absolute top-0 -left-2 w-0 h-0 border-t-[10px] border-l-[10px] border-l-transparent border-b-[10px] border-b-transparent ${isCancelled ? 'border-t-zinc-50' : 'border-t-white'}`}></div>
+                        )}
 
                         <div className="flex items-end gap-3 min-w-[70px]">
                           <span className="text-[15px] leading-snug pt-0.5">
                             {isCancelled ? <s>₹{msg.amount}</s> : `₹${msg.amount}`}
                           </span>
-                          <div className="flex items-center gap-1 shrink-0 mb-[1px] text-zinc-400 ml-auto">
+                          <div className={`flex items-center gap-1 shrink-0 mb-[1px] ml-auto ${msg.isSelf ? 'text-emerald-700/80' : 'text-zinc-400'}`}>
                             <span className="text-[10px] leading-none">
                               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
+                            {msg.isSelf && (
+                              msg.read 
+                                ? <CheckCheck className="h-3.5 w-3.5 text-blue-500" />
+                                : <CheckCheck className="h-3.5 w-3.5 text-zinc-400" />
+                            )}
                           </div>
                         </div>
 
                         {!isCancelled && (
-                          <div className={`items-center gap-1 absolute -right-[4.5rem] top-1 z-10 ${activeMsgId === msg.id ? 'flex' : 'hidden group-hover:flex'}`}>
+                          <div className={`items-center gap-1 absolute top-1 z-10 ${msg.isSelf ? '-left-[4.5rem]' : '-right-[4.5rem]'} ${activeMsgId === msg.id ? 'flex' : 'hidden group-hover:flex'}`}>
                             <button onClick={(e) => { e.stopPropagation(); setEditingMsg({ id: msg.id, amount: msg.amount || 0 }); setActiveMsgId(null); }} className="p-1 text-zinc-400 hover:text-zinc-700 bg-white rounded-full shadow-sm border border-zinc-200"><Edit2 className="w-3 h-3" /></button>
                             <button onClick={(e) => { e.stopPropagation(); handleDeletePurchase(msg.id); setActiveMsgId(null); }} className="p-1 text-rose-400 hover:text-rose-600 bg-white rounded-full shadow-sm border border-rose-200"><Trash2 className="w-3 h-3" /></button>
                           </div>
                         )}
                       </div>
                     </div>
-                  )
+                  </div>
+                )
                 }
 
                 // Payment
                 if (msg.type === 'PAYMENT') {
                   return (
-                    <div key={msg.id} className="flex flex-col items-end w-full mb-1">
-                      <div className="relative max-w-[75%] bg-[#d9fdd3] text-zinc-900 rounded-lg shadow-sm px-2.5 py-1.5 mr-2">
+                    <div key={msg.id} className="w-full flex flex-col">
+                      {dateBadge}
+                      <div className="flex flex-col items-end w-full mb-1">
+                        <div className="relative max-w-[75%] bg-[#d9fdd3] text-zinc-900 rounded-lg shadow-sm px-2.5 py-1.5 mr-2">
                         {/* Tail */}
                         <div className="absolute top-0 -right-2 w-0 h-0 border-t-[10px] border-t-[#d9fdd3] border-r-[10px] border-r-transparent border-b-[10px] border-b-transparent"></div>
 
@@ -505,7 +582,8 @@ export default function VendorChatClient({ initialCustomers }: { initialCustomer
                         </div>
                       </div>
                     </div>
-                  )
+                  </div>
+                )
                 }
               })}
               <div ref={messagesEndRef} />
